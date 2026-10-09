@@ -1,13 +1,13 @@
 {
-    "name": "SillyTavern-StateEngine-ExtensionTemplate",
-    "display_name": "State Engine Extension Template",
-    "description": "Blank scaffold for a SillyTavern extension that integrates with the State Engine API. Contains no business logic by design - clone it, rename the namespace, and start building on top of it.",
+    "name": "sillytavern-curator",
+    "display_name": "Curator",
+    "description": "An extension for SillyTavern to provide tools for analyzing and controlling LLM context usage in requests. Interacts with State-Engine if it is installed but does not require it.",
     "version": "0.1.0",
     "js": "src/index.js",
     "loading_order": 100,
     "requires": [],
     "optional": [],
     "author": "",
-    "homePage": "https://github.com/StygianTechnica/SillyTavern-StateEngine-ExtensionTemplate",
+    "homePage": "https://github.com/StygianTechnica/SillyTavern-Curator.git",
     "auto_update": false
 }
