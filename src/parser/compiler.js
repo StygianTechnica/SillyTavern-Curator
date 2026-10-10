@@ -40,11 +40,12 @@ export class CuratorCompiler {
         const withPrompts = this.insertPrompts(withSnippets);
 
         // 6. Merge blocks into final text
-        const finalText = this.mergeBlocks(withPrompts);
+        const finalText = this.mergeBlocks(withPrompts, snapshot.meta.kind);
 
         // 7. Store final text in snapshot
         snapshot.finalText = finalText;
         snapshot.meta.compiledLength = finalText.length;
+        snapshot.meta.compiledTokens = this.countTokens(snapshot);
 
         return finalText;
     }
@@ -91,12 +92,33 @@ export class CuratorCompiler {
     }
 
     /**
-     * Merge blocks into final text.
+     * Flatten groups (chat history, example dialogue) into their enabled
+     * children, in order.
      */
-    mergeBlocks(blocks) {
-        return blocks
-            .map(b => b.text.trim())
-            .filter(t => t.length > 0)
+    flatten(blocks) {
+        return blocks.flatMap(b => (b.children?.length
+            ? this.sortBlocks(this.filterEnabled(b.children))
+            : [b]));
+    }
+
+    /**
+     * Total tokens of the enabled blocks.
+     */
+    countTokens(snapshot) {
+        return this.flatten(this.sortBlocks(this.filterEnabled(snapshot.blocks))).reduce((sum, b) => sum + (b.tokens || 0), 0);
+    }
+
+    /**
+     * Merge blocks into final text. Chat Completion prompts are a message
+     * list, shown one "[role]" message after another; Text Completion
+     * prompts are one string, so their segments are joined exactly as cut.
+     */
+    mergeBlocks(blocks, kind = null) {
+        const flat = this.flatten(blocks);
+        if (kind === 'tc') return flat.map(b => b.text).join('');
+        return flat
+            .filter(b => b.text.trim().length > 0)
+            .map(b => (kind === 'cc' ? `[${b.role ?? 'system'}]\n${b.text.trim()}` : b.text.trim()))
             .join('\n\n');
     }
 }

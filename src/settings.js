@@ -6,6 +6,11 @@ const SETTINGS_KEY = 'curator';
 
 const DEFAULTS = {
     enabled: true,
+    // When true, every Chat Completion prompt is rearranged by `layout`
+    // before it is sent (src/capture.js, src/prompt/sections.js).
+    applyLayout: false,
+    // { sections: [{ key, enabled, text? }] } - saved from the analyzer modal.
+    layout: null,
     // Virtual file store used by src/storage/storage.js: path -> JSON value.
     files: {},
 };

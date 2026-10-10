@@ -11,33 +11,19 @@
                     <input id="cr_enabled" type="checkbox" />
                     <span>Enable Curator</span>
                 </label>
+                <label class="checkbox_label" title="Rearrange every Chat Completion prompt by the arrangement saved in the Prompt Analyzer. Overrides the prompt manager's order.">
+                    <input id="cr_apply_layout" type="checkbox" />
+                    <span>Curator controls prompt order</span>
+                </label>
             </div>
             <small id="cr_status" class="cr-hint"></small>
 
             <hr class="sysHR" />
 
             <div class="cr-section">
-                <div class="cr-heading">
-                    <i class="fa-solid fa-magnifying-glass-chart"></i>
-                    <b>Prompt Analyzer</b>
-                </div>
-                <small id="cr_capture_info" class="cr-hint">No prompt captured yet - send a message (or open a chat) first.</small>
-                <div class="cr-actions">
-                    <div id="cr_analyze" class="menu_button menu_button_icon" title="Split the last captured prompt into blocks">
-                        <i class="fa-solid fa-magnifying-glass"></i><span>Analyze Last Prompt</span>
-                    </div>
-                    <div id="cr_compile" class="menu_button menu_button_icon" title="Rebuild the prompt from the enabled blocks">
-                        <i class="fa-solid fa-gears"></i><span>Compile</span>
-                    </div>
-                    <div id="cr_clear" class="menu_button menu_button_icon" title="Discard the current snapshot">
-                        <i class="fa-solid fa-eraser"></i><span>Clear</span>
-                    </div>
-                </div>
-                <small id="cr_snapshot_info" class="cr-hint"></small>
-                <div id="cr_block_list" class="cr-block-list"></div>
-                <div id="cr_compiled_wrap" class="cr-compiled-wrap" hidden>
-                    <b>Compiled prompt</b>
-                    <textarea id="cr_compiled" class="text_pole textarea_compact" rows="8" readonly></textarea>
+                <small id="cr_capture_info" class="cr-hint"></small>
+                <div id="cr_analyze" class="menu_button menu_button_icon" title="Open the Prompt Analyzer on the last prompt">
+                    <i class="fa-solid fa-magnifying-glass-chart"></i><span>Open Prompt Analyzer</span>
                 </div>
             </div>
 
@@ -48,12 +34,7 @@
                     <i class="fa-solid fa-camera"></i>
                     <b>Snapshots</b>
                 </div>
-                <small class="cr-hint">Saved analyses, shared across all chats.</small>
-                <div class="cr-actions">
-                    <div id="cr_save_snapshot" class="menu_button menu_button_icon" title="Save the current snapshot">
-                        <i class="fa-solid fa-floppy-disk"></i><span>Save Snapshot</span>
-                    </div>
-                </div>
+                <small class="cr-hint">Frozen copies of analysed prompts, for comparing later. Save one from the Prompt Analyzer; the 5 most recent are kept, oldest dropped first.</small>
                 <div id="cr_snapshot_list" class="cr-snapshot-list"></div>
             </div>
 

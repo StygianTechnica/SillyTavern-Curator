@@ -13,7 +13,13 @@ export class PromptSnapshot {
             compiledLength: 0,
             templateUsed: null,
             characterId: null,
-            personaId: null
+            personaId: null,
+            kind: null,                     // 'cc' (chat completion) | 'tc' (text completion)
+            contextSize: 0,                 // max context of the connection, in tokens
+            api: null,
+            model: null,
+            preset: null,
+            capturedAt: null
         };
     }
 
@@ -44,7 +50,7 @@ export class PromptSnapshot {
         snap.id = json.id || null;
         snap.createdAt = json.createdAt || Date.now();
         snap.finalText = json.finalText || "";
-        snap.meta = json.meta || {};
+        snap.meta = { ...new PromptSnapshot().meta, ...(json.meta || {}) };
 
         snap.blocks = (json.blocks || []).map(b => PromptBlock.fromJSON(b));
 
@@ -64,7 +70,13 @@ export class PromptBlock {
         text = "",
         enabled = true,
         order = 0,
-        provenance = null
+        provenance = null,
+        category = 'other',
+        tokens = 0,
+        role = null,
+        children = [],
+        notes = [],
+        edited = false
     } = {}) {
         this.id = id;               // unique block ID
         this.type = type;           // block type (persona, chat, WI, etc.)
@@ -73,6 +85,16 @@ export class PromptBlock {
         this.enabled = enabled;     // user toggle
         this.order = order;         // ordering index
         this.provenance = provenance; // where this block came from (persona, WI entry, extension, etc.)
+        this.category = category;   // colour group, see CATEGORIES in src/prompt/sources.js
+        this.tokens = tokens;       // token count of text (or of children, for a group)
+        this.role = role;           // chat completion role, if any
+        this.children = children;   // PromptBlocks of a group (chat history, example dialogue)
+        this.notes = notes;         // [{ label, category, constant }] sources found inside the text
+        this.edited = edited;       // text changed by the user
+    }
+
+    get isGroup() {
+        return this.children.length > 0;
     }
 
     toJSON() {
@@ -83,19 +105,21 @@ export class PromptBlock {
             text: this.text,
             enabled: this.enabled,
             order: this.order,
-            provenance: this.provenance
+            provenance: this.provenance,
+            category: this.category,
+            tokens: this.tokens,
+            role: this.role,
+            children: this.children.map(c => c.toJSON()),
+            notes: this.notes,
+            edited: this.edited
         };
     }
 
     static fromJSON(json) {
         return new PromptBlock({
-            id: json.id,
-            type: json.type,
-            label: json.label,
-            text: json.text,
-            enabled: json.enabled,
-            order: json.order,
-            provenance: json.provenance
+            ...json,
+            children: (json.children || []).map(c => PromptBlock.fromJSON(c)),
+            notes: json.notes || []
         });
     }
 }

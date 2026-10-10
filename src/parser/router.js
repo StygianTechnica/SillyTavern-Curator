@@ -10,6 +10,16 @@ import {
 } from '../storage/storage.js';
 import { PromptSnapshot } from '../models/PromptSnapshot.js';
 
+// Only the most recent snapshots are kept; saving one more drops the oldest.
+// Each holds a full prompt (chat history included) inside SillyTavern's
+// settings file, so this stays small on purpose.
+export const MAX_SNAPSHOTS = 5;
+
+// Snapshot ids are "snapshot-<Date.now()>"; newest first.
+function snapshotTime(id) {
+    return Number(String(id).split('-').pop()) || 0;
+}
+
 /**
  * Curator Router
  * --------------
@@ -56,7 +66,12 @@ export class CuratorRouter {
         const id = snapshot.id || `snapshot-${Date.now()}`;
         snapshot.id = id;
 
-        return await saveSnapshot(id, snapshot.toJSON());
+        const saved = await saveSnapshot(id, snapshot.toJSON());
+        if (saved) {
+            const stale = (await this.listSnapshots()).slice(MAX_SNAPSHOTS);
+            for (const { id: oldId } of stale) await deleteSnapshot(oldId);
+        }
+        return saved;
     }
 
     /**
@@ -75,7 +90,9 @@ export class CuratorRouter {
      * @returns {Promise<Array>}
      */
     async listSnapshots() {
-        return await listSnapshots();
+        return (await listSnapshots())
+            .map(entry => ({ ...entry, savedAt: snapshotTime(entry.id) }))
+            .sort((a, b) => b.savedAt - a.savedAt);
     }
 
     /**
@@ -94,7 +111,7 @@ export class CuratorRouter {
      * @returns {Promise<PromptSnapshot>}
      */
     async analyzeCompileSave(rawText) {
-        const snapshot = this.analyzePrompt(rawText);
+        const snapshot = await this.analyzePrompt(rawText);
         this.compileSnapshot(snapshot);
         await this.saveSnapshot(snapshot);
         return snapshot;
