@@ -10,6 +10,8 @@
 // SECTIONS (keyed so the same section has the same key on every
 // generation) - the unit Curator shows, reorders and toggles.
 
+import { historyKeepMask } from './history-limit.js';
+
 // Section key for one leaf: every chat history message shares the
 // 'chatHistory' section, every example dialogue message 'dialogueExamples';
 // everything else is its own identifier.
@@ -135,12 +137,19 @@ export function placeInjections(list, injections, keyOf) {
 // length, same order). Returns false (and leaves chat untouched) if they
 // don't line up.
 //   injections: [{ key, anchor, role, content }]
-export function buildOutgoing(chat, leaves, { layout = null, reorder = false, injections = [] } = {}) {
+//   historyLimit: keep only the last N chat messages of Chat History
+//     (null = all); chatFlags[i] says whether leaf i is a chat message
+//     (src/prompt/history-limit.js), so injections inside it are kept.
+export function buildOutgoing(chat, leaves, { layout = null, reorder = false, injections = [], historyLimit = null, chatFlags = null } = {}) {
     if (!Array.isArray(chat) || chat.length !== leaves.length) return false;
-    const sections = groupSections(leaves).map(section => ({
-        key: section.key,
-        messages: chat.slice(section.start, section.start + section.leaves.length),
-    }));
+    const sections = groupSections(leaves).map(section => {
+        let messages = chat.slice(section.start, section.start + section.leaves.length);
+        if (section.key === 'chatHistory' && historyLimit !== null && chatFlags) {
+            const keep = historyKeepMask(chatFlags.slice(section.start, section.start + messages.length), historyLimit);
+            messages = messages.filter((_, i) => keep[i]);
+        }
+        return { key: section.key, messages };
+    });
     const arranged = reorder && layout
         ? arrange(sections, layout)
         : sections.map(item => ({ item, enabled: true, text: null }));

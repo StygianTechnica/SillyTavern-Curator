@@ -850,3 +850,22 @@
 .cr-report-missing      { --cr-report: #a070e0; }
 .cr-report-tokenPressure { --cr-report: #e8973a; }
 .cr-report-ordering     { --cr-report: #4fb8b0; }
+
+/* Chat history limit (in the Chat History row) */
+.cr-modal .cr-history-limit {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.85em;
+    white-space: nowrap;
+}
+
+.cr-modal .cr-history-limit input {
+    width: 4.5em;
+    margin: 0;
+    padding: 1px 4px;
+}
+
+.cr-modal .cr-history-stats {
+    opacity: 0.75;
+}

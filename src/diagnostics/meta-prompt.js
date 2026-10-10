@@ -30,8 +30,10 @@ const fmt = n => Number(n || 0).toLocaleString();
  */
 export function buildDiagnosticPrompt({ question, compiled, sections = [], totalTokens = 0, contextSize = 0, targetModel = null }) {
     const sectionLines = sections.map((s, i) => `${i + 1}. ${s.label} [${s.category}${s.role ? `, ${s.role}` : ''}] - ${fmt(s.tokens)} tokens`).join('\n');
+    const share = contextSize ? totalTokens / contextSize : 0;
+    const pressure = share >= 0.85 ? 'close to the limit' : share >= 0.6 ? 'getting full' : 'well within the limit';
     const budget = contextSize
-        ? `${fmt(totalTokens)} of ${fmt(contextSize)} context tokens (${((totalTokens / contextSize) * 100).toFixed(0)}%)`
+        ? `${fmt(totalTokens)} of ${fmt(contextSize)} context tokens (${(share * 100).toFixed(0)}% - ${pressure})`
         : `${fmt(totalTokens)} tokens`;
     const headings = Object.values(REPORT_SECTIONS).map(([heading]) => `## ${heading}`).join('\n');
 
@@ -43,7 +45,8 @@ ${question}
 About the prompt:
 - Target model: ${targetModel || 'unknown'}
 - Size: ${budget}
-- It is a chat prompt: sections are sent in this order, each as its own message (role in brackets).
+- It is a chat prompt: sections are sent in this order, each as its own message. In the section list, the first bracketed word is Curator's label for where the text came from (character card, lorebook, preset...) - the model never sees it; the second is the message role (system, user, assistant).
+- Lines starting with "[role]" in the compiled prompt only separate messages.
 ${sectionLines ? `Sections:\n${sectionLines}` : ''}
 
 Compiled prompt (between the markers; "[role]" lines separate messages):

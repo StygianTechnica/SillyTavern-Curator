@@ -21,6 +21,8 @@ import { getSettings } from './settings.js';
 import { flattenMessages, buildOutgoing, contentText } from './prompt/sections.js';
 import { getInjections, injectionKey, resolvedText } from './injections/store.js';
 import { buildVariableInjections } from './injections/variables.js';
+import { normalizeLimit, chatMessageFlags } from './prompt/history-limit.js';
+import { sectionKey } from './prompt/sections.js';
 
 let lastPrompt = null;
 let openaiModule = null;
@@ -80,10 +82,17 @@ async function onChatCompletionPrompt(data) {
     // State Engine variables other extensions offer (only with State Engine).
     injections.push(...await buildVariableInjections(lastPrompt.chatId));
     const reorder = Boolean(settings.applyLayout && settings.layout);
-    if (reorder || injections.length) {
-        buildOutgoing(data.chat, leaves, { layout: settings.layout, reorder, injections });
+    const historyLimit = normalizeLimit(settings.historyLimit);
+    if (reorder || injections.length || historyLimit !== null) {
+        const flags = historyLimit === null ? null : (() => {
+            const inHistory = leaves.map(l => sectionKey(l) === 'chatHistory');
+            const isChat = chatMessageFlags(leaves.map((l, i) => (inHistory[i] ? l.content : '')), SillyTavern.getContext().chat);
+            return isChat.map((flag, i) => inHistory[i] && flag);
+        })();
+        buildOutgoing(data.chat, leaves, { layout: settings.layout, reorder, injections, historyLimit, chatFlags: flags });
         lastPrompt.applied = reorder;
         lastPrompt.injected = injections.length;
+        lastPrompt.historyLimit = historyLimit;
     }
     emit();
 }

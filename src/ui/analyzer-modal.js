@@ -29,6 +29,7 @@ import {
     variableKey, isVariableKey, nameFromKey,
 } from '../injections/variables.js';
 import { isStateEngineConnected } from '../api/connection.js';
+import { normalizeLimit, chatMessageFlags, historyKeepMask } from '../prompt/history-limit.js';
 import { PromptSnapshot } from '../models/PromptSnapshot.js';
 import { openTesterModal } from './tester-modal.js';
 import { openDiagnosticsModal } from './diagnostics-modal.js';
@@ -134,6 +135,29 @@ async function arrangeSnapshot(snapshot) {
         for (const block of snapshot.blocks.filter(b => b.edited)) block.tokens = await countTokens(block.text);
     }
     await syncInjectionBlocks(snapshot);
+    applyHistoryLimit(snapshot);
+}
+
+// Switches off the chat messages a history limit drops (marking them
+// .limited), and back on when the limit no longer drops them - the same
+// rule src/capture.js applies to the outgoing prompt.
+function applyHistoryLimit(snapshot = getSnapshot()) {
+    const group = snapshot.blocks.find(b => b.id === 'chatHistory');
+    if (!group?.children?.length) return;
+    const limit = injectionsSupported() ? normalizeLimit(getSettings().historyLimit) : null;
+    const children = [...group.children].sort((a, b) => a.order - b.order);
+    const isChat = chatMessageFlags(children.map(c => c.text), SillyTavern.getContext().chat);
+    const keep = historyKeepMask(isChat, limit);
+    children.forEach((child, i) => {
+        if (!keep[i]) {
+            child.enabled = false;
+            child.limited = true;
+        } else if (child.limited) {
+            child.enabled = true;
+            child.limited = false;
+        }
+    });
+    group.historyStats = { kept: isChat.filter((c, i) => c && keep[i]).length, total: isChat.filter(Boolean).length };
 }
 
 async function injectionBlock(injection) {
@@ -250,6 +274,8 @@ function renderRow(block, { child = false } = {}) {
                 ${block.edited ? '<span class="cr-badge" title="Text edited">edited</span>' : ''}
                 ${variable ? `<span class="cr-badge cr-source" title="Offered by this State Engine extension">${escapeHtml(block.provenance?.extensionId ?? '')}</span>` : ''}
                 ${variable && !block.provenance?.hasValue ? '<span class="cr-badge" title="This chat holds no value for it, so nothing is sent">no value</span>' : ''}
+                ${child && block.limited ? '<span class="cr-badge" title="Dropped by the chat history limit">beyond limit</span>' : ''}
+                ${block.id === 'chatHistory' && injectionsSupported() ? renderHistoryLimit(block) : ''}
                 ${block.role && !child ? `<span class="cr-role">${escapeHtml(block.role)}</span>` : ''}
                 <span class="cr-tokens" title="${pct.toFixed(1)}% of context">${fmt(tokens)} tok</span>
                 <span class="cr-meter" title="${pct.toFixed(1)}% of context"><span style="width:${Math.min(100, pct * 2).toFixed(1)}%"></span></span>
@@ -257,6 +283,14 @@ function renderRow(block, { child = false } = {}) {
             </div>
             <div class="cr-block-body"${isOpen ? '' : ' hidden'}>${isOpen ? renderBody(block) : ''}</div>
         </li>`;
+}
+
+function renderHistoryLimit(block) {
+    const limit = normalizeLimit(getSettings().historyLimit);
+    const stats = block.historyStats;
+    const summary = stats && limit !== null ? `<small class="cr-history-stats">${stats.kept} of ${stats.total}</small>` : '';
+    return `<label class="cr-history-limit" title="Keep only the most recent chat messages in every prompt (blank = all). In-chat injections inside the history are always kept. Saved - applies to every chat.">
+        <span>last</span><input type="number" class="text_pole cr-history-limit-input" min="0" step="1" value="${limit ?? ''}" placeholder="all" /><span>msgs</span>${summary}</label>`;
 }
 
 function renderNotes(block) {
@@ -457,6 +491,9 @@ function renderLibrary() {
     }
     list.innerHTML = blocks.map(b => {
         const editing = editingInjection === b.id;
+        // A block added from a Curator preset whose text has since been improved.
+        const preset = b.source?.preset ? INJECTION_PRESETS.find(p => p.id === b.source.preset) : null;
+        const outdated = preset && preset.text !== b.text;
         return `
             <li class="cr-lib-item${b.enabled ? '' : ' cr-off'}" data-id="${escapeHtml(b.id)}" style="--cr-cat:${escapeHtml(b.color || DEFAULT_COLOR)}">
                 <div class="cr-lib-head">
@@ -464,6 +501,7 @@ function renderLibrary() {
                     <input type="color" class="cr-lib-color" value="${escapeHtml(b.color || DEFAULT_COLOR)}" title="Colour" />
                     <input type="checkbox" class="cr-lib-enabled" ${b.enabled ? 'checked' : ''} title="Enabled - sent with every Chat Completion prompt" />
                     <span class="cr-lib-name" title="${escapeHtml(b.name)}">${escapeHtml(b.name)}</span>
+                    ${outdated ? '<div class="menu_button fa-solid fa-arrows-rotate cr-lib-update" title="This preset has a newer text - replace this block\'s text with it (your edits to this block are lost)"></div>' : ''}
                     <div class="menu_button fa-solid fa-pen cr-lib-edit" title="Edit"></div>
                     <div class="menu_button fa-solid fa-bookmark cr-lib-save-preset" title="Save as my preset - reusable from the Add menu"></div>
                     <div class="menu_button fa-solid fa-clone cr-lib-clone" title="Clone"></div>
@@ -798,6 +836,14 @@ function wireEvents() {
             } else if (e.target.closest('.cr-lib-done')) {
                 editingInjection = null;
                 renderLibrary();
+            } else if (e.target.closest('.cr-lib-update')) {
+                const block = getInjection(id);
+                const preset = INJECTION_PRESETS.find(p => p.id === block?.source?.preset);
+                if (preset) {
+                    updateInjection(id, { text: preset.text });
+                    toastr.success(`"${block.name}" now uses the latest preset text.`, 'Curator');
+                    await afterLibraryChange();
+                }
             } else if (e.target.closest('.cr-lib-save-preset')) {
                 const block = getInjection(id);
                 if (block && !block.text.trim()) {
@@ -884,6 +930,17 @@ function wireEvents() {
             else if (target.classList.contains('cr-lib-role')) updateInjection(id, { role: target.value });
             else if (target.classList.contains('cr-lib-text')) updateInjection(id, { text: target.value });
             await afterLibraryChange();
+            return;
+        }
+
+        if (target.classList.contains('cr-history-limit-input')) {
+            getSettings().historyLimit = normalizeLimit(target.value);
+            saveSettings();
+            applyHistoryLimit();
+            renderList();
+            refreshMeters();
+            const limit = getSettings().historyLimit;
+            toastr.info(limit === null ? 'Chat history limit removed - all messages SillyTavern includes are sent.' : `Only the last ${limit} chat messages are sent from now on.`, 'Curator');
             return;
         }
 
