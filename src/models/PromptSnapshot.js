@@ -76,7 +76,8 @@ export class PromptBlock {
         role = null,
         children = [],
         notes = [],
-        edited = false
+        edited = false,
+        color = null
     } = {}) {
         this.id = id;               // unique block ID
         this.type = type;           // block type (persona, chat, WI, etc.)
@@ -91,6 +92,7 @@ export class PromptBlock {
         this.children = children;   // PromptBlocks of a group (chat history, example dialogue)
         this.notes = notes;         // [{ label, category, constant }] sources found inside the text
         this.edited = edited;       // text changed by the user
+        this.color = color;         // custom colour (Curator injection blocks)
     }
 
     get isGroup() {
@@ -111,7 +113,8 @@ export class PromptBlock {
             role: this.role,
             children: this.children.map(c => c.toJSON()),
             notes: this.notes,
-            edited: this.edited
+            edited: this.edited,
+            color: this.color
         };
     }
 

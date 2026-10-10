@@ -12,6 +12,8 @@ import { declareCapabilities } from './api/capabilities.js';
 import { getSettings } from './settings.js';
 import { initPromptCapture } from './capture.js';
 import { addSettingsDrawer, setStateEngineStatus } from './ui/settings-drawer.js';
+import { registerInjectionProvider, unregisterInjectionProvider } from './injections/providers.js';
+import { getInjections } from './injections/store.js';
 
 // ---------------------------------------------------------------------
 // EXTENSION IDENTITY - rename these before building on this template.
@@ -30,10 +32,27 @@ const EXTENSION_ID = 'Curator';
 // letter - see the State Engine API Reference, "Namespace Model".
 const NAMESPACE = 'cr';
 
-// Plain strings describing what your extension provides, e.g.
-// "ui.panel" or "data.inventory" - leave empty until you actually
-// provide something another extension might want to depend on.
-const CAPABILITIES = [];
+// Plain strings describing what this extension provides to other State
+// Engine extensions: global injection blocks (see window.Curator below).
+const CAPABILITIES = ['prompt.injectionBlocks'];
+
+// Curator's public API for other extensions (see src/injections/providers.js).
+// Exposed whether or not State Engine is installed; an integration that
+// loads before Curator waits for the 'curator:ready' event on document.
+function exposePublicApi() {
+    window.Curator = Object.freeze({
+        version: 1,
+        registerInjectionProvider,
+        unregisterInjectionProvider,
+        // Read-only copies of the user's global injection blocks.
+        getInjectionBlocks: () => structuredClone(getInjections()),
+    });
+    try {
+        document.dispatchEvent(new CustomEvent('curator:ready', { detail: window.Curator }));
+    } catch (err) {
+        console.warn('[Curator] could not announce curator:ready', err);
+    }
+}
 
 // Called once, on load (see src/index.js). Safe to call again on a
 // later page load - claimNamespace() is idempotent for the same
@@ -48,6 +67,7 @@ const CAPABILITIES = [];
 export async function initExtension() {
     getSettings();
     initPromptCapture();
+    exposePublicApi();
     await addSettingsDrawer('Checking for State Engine...');
 
     const available = await ensureStateEngineAvailable();

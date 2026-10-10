@@ -1,6 +1,7 @@
-// Captures the most recent prompt SillyTavern assembled, and - when the
-// user has turned on "Curator controls prompt order" - rewrites it before
-// it is sent.
+// Captures the most recent prompt SillyTavern assembled, and rewrites it
+// before it is sent: Curator's enabled injection blocks are inserted, and -
+// when the user has turned on "Curator controls prompt order" -
+// SillyTavern's own sections are rearranged.
 //
 // Chat Completion: CHAT_COMPLETION_PROMPT_READY hands over the exact
 // message array about to be sent ({ chat, dryRun }); SillyTavern sends
@@ -17,7 +18,8 @@
 // available without sending anything.
 
 import { getSettings } from './settings.js';
-import { flattenMessages, applyLayoutToChat, contentText } from './prompt/sections.js';
+import { flattenMessages, buildOutgoing, contentText } from './prompt/sections.js';
+import { getInjections, injectionKey, resolvedText } from './injections/store.js';
 
 let lastPrompt = null;
 let openaiModule = null;
@@ -69,8 +71,16 @@ async function onChatCompletionPrompt(data) {
         capturedAt: Date.now(),
     };
 
-    if (settings.applyLayout && settings.layout) {
-        lastPrompt.applied = applyLayoutToChat(data.chat, leaves, settings.layout);
+    // Curator's own injection blocks are always sent (when enabled);
+    // SillyTavern's sections are only reordered when the user asked for it.
+    const injections = getInjections()
+        .filter(b => b.enabled && b.text.trim())
+        .map(b => ({ key: injectionKey(b.id), anchor: b.anchor, role: b.role, content: resolvedText(b) }));
+    const reorder = Boolean(settings.applyLayout && settings.layout);
+    if (reorder || injections.length) {
+        buildOutgoing(data.chat, leaves, { layout: settings.layout, reorder, injections });
+        lastPrompt.applied = reorder;
+        lastPrompt.injected = injections.length;
     }
     emit();
 }

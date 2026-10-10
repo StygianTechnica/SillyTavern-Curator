@@ -15,6 +15,7 @@ export const CATEGORIES = {
     authorsNote: "Author's Note",
     extension: 'Extensions',
     injection: 'In-chat Injection',
+    curator: 'Curator Blocks',
     other: 'Other',
 };
 

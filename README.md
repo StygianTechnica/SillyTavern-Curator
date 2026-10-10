@@ -10,7 +10,10 @@ A large popup showing the last prompt SillyTavern built (or a fresh dry run - **
 - **Text Completion**: sections are found by matching known text (character card, persona, lorebook entries, chat messages) inside the prompt string, so boundaries are approximate.
 - **Connected Lorebooks**: every connected book, its constant entries (and whether they made it into the prompt), and the entries triggered in this prompt.
 
-Drag sections (grip handle) to reorder, untick to drop, expand to read or edit. **Compile** shows the resulting prompt.
+Drag sections (grip handle) to reorder, untick to drop, expand to read or edit. **Compile** shows the resulting prompt. **Find** searches the prompt text: Enter / Shift+Enter (or the arrows) step through each match, opening its section and highlighting it.
+
+## Injection Blocks
+Global blocks of your own text, sent with every Chat Completion prompt in every chat, wherever you drag them. Create, edit, colour, enable, clone, reorder and delete them in the analyzer's Injection Blocks panel; add ready-made ones from presets or other extensions; or clone any prompt section into one to experiment. **Keep them setting-agnostic** - setting-specific content belongs in the character, persona, scenario or lorebooks. See [docs/injection-blocks.md](docs/injection-blocks.md).
 
 ## Curator controls prompt order (Chat Completion)
 **Save Arrangement** stores the order, on/off state and edited text of each section. With **Curator controls prompt order** on, every Chat Completion prompt is rearranged that way just before it is sent - overriding the prompt manager. Sections Curator hasn't seen before keep their place after their neighbour. Raw generations from other extensions (trackers etc.) are never touched. Edited text replaces that section on *every* generation, so prefer editing static sections (Main Prompt, custom prompts).

@@ -92,18 +92,68 @@ export function arrange(items, layout) {
     });
 }
 
-// Rewrites the outgoing chat array IN PLACE according to the layout.
-// `chat` is the array SillyTavern is about to send; `leaves` its flattened
-// description (same length, same order). Returns false (and leaves chat
-// untouched) if they don't line up.
-export function applyLayoutToChat(chat, leaves, layout) {
+// Inserts injection blocks into an ordered list. Each injection goes
+// directly after its anchor (the key of the block that was above it when
+// the user placed it; '^' = top). An injection anchored to another
+// injection is placed once that one is. Anything without a usable anchor
+// (never placed, or its anchor isn't in this prompt) goes just before Chat
+// History, or at the end. `keyOf(entry)` reads an entry's key; injections
+// carry `.anchor`. Returns a new list.
+export function placeInjections(list, injections, keyOf) {
+    const result = [...list];
+    let pending = [...injections];
+    let topCount = 0;
+    let progress = true;
+    while (pending.length && progress) {
+        progress = false;
+        for (const injection of [...pending]) {
+            const anchor = injection.anchor;
+            let index = -1;
+            if (anchor === '^') index = topCount++;
+            else if (anchor) {
+                const at = result.findIndex(entry => keyOf(entry) === anchor);
+                if (at >= 0) index = at + 1;
+            }
+            if (index < 0) continue;
+            result.splice(index, 0, injection);
+            pending = pending.filter(p => p !== injection);
+            progress = true;
+        }
+    }
+    for (const injection of pending) {
+        const chatIndex = result.findIndex(entry => keyOf(entry) === 'chatHistory');
+        if (chatIndex >= 0) result.splice(chatIndex, 0, injection);
+        else result.push(injection);
+    }
+    return result;
+}
+
+// Rewrites the outgoing chat array IN PLACE: SillyTavern's own sections
+// rearranged by `layout` (only when `reorder` is on), then Curator's
+// enabled injection blocks inserted at their places. `chat` is the array
+// SillyTavern is about to send; `leaves` its flattened description (same
+// length, same order). Returns false (and leaves chat untouched) if they
+// don't line up.
+//   injections: [{ key, anchor, role, content }]
+export function buildOutgoing(chat, leaves, { layout = null, reorder = false, injections = [] } = {}) {
     if (!Array.isArray(chat) || chat.length !== leaves.length) return false;
     const sections = groupSections(leaves).map(section => ({
         key: section.key,
         messages: chat.slice(section.start, section.start + section.leaves.length),
     }));
+    const arranged = reorder && layout
+        ? arrange(sections, layout)
+        : sections.map(item => ({ item, enabled: true, text: null }));
+    const injected = injections.map(inj => ({
+        item: { key: inj.key, messages: [{ role: inj.role, content: inj.content }] },
+        enabled: true,
+        text: null,
+        anchor: inj.anchor,
+    }));
+    const placed = placeInjections(arranged, injected, entry => entry.item.key);
+
     const result = [];
-    for (const { item, enabled, text } of arrange(sections, layout)) {
+    for (const { item, enabled, text } of placed) {
         if (!enabled) continue;
         if (text !== null && item.key !== 'chatHistory' && item.key !== 'dialogueExamples') {
             // A replaced section is sent as one message, in its first message's role.

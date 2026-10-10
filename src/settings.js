@@ -11,6 +11,8 @@ const DEFAULTS = {
     applyLayout: false,
     // { sections: [{ key, enabled, text? }] } - saved from the analyzer modal.
     layout: null,
+    // Global injection blocks (src/injections/store.js), shared by all chats.
+    injections: [],
     // Virtual file store used by src/storage/storage.js: path -> JSON value.
     files: {},
 };
