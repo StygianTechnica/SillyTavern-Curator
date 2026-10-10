@@ -13,6 +13,8 @@ const DEFAULTS = {
     layout: null,
     // Global injection blocks (src/injections/store.js), shared by all chats.
     injections: [],
+    // The user's own reusable injection texts (src/injections/user-presets.js).
+    userPresets: [],
     // Virtual file store used by src/storage/storage.js: path -> JSON value.
     files: {},
 };

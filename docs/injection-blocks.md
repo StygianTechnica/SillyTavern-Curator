@@ -27,7 +27,8 @@ A block like "The city of Brass is ruled by guilds" would leak into every other 
 
 | | How |
 |---|---|
-| Create | **+** in the panel. New blocks start switched off so you can write them first. |
+| Create your own | **+ Blank** in the panel (or **Blank block** in the Add menu). It starts enabled with its editor open, and is only sent once it has text. |
+| Save as my preset | Bookmark icon. The text becomes reusable from **My presets** in the Add menu. Saving again under the same name updates it. Manage them under **My presets** in the panel. |
 | Edit / rename / change role | Pencil (or click the name). Text can also be edited straight in the prompt list. |
 | Colour | The colour swatch. The block is drawn in this colour in the prompt list. |
 | Enable / disable | The tick box, in the panel or on the block in the prompt list. |
@@ -35,8 +36,14 @@ A block like "The city of Brass is ruled by guilds" would leak into every other 
 | Delete | Bin icon (asks first). Removed from every chat. |
 | Reorder the library | Drag by the grip in the panel. |
 | Place in the prompt | Drag the block in the prompt list, like any other section. Its place is saved immediately. |
-| Add a ready-made block | **Add from...**: Curator presets, plus blocks offered by other extensions. |
+| Add a ready-made block | **Add a block...**: your presets, Curator presets, plus blocks offered by other extensions. |
 | Clone a prompt section | Open any section (or a single chat message) and press **Clone to injection block**. The copy lands right below the original, so you can switch the original off and experiment with the copy. |
+
+### The GM Card preset
+
+**GM Card (multi-character narrator)** is a complete Game Master instruction set: you narrate the world and play every NPC, never act for {{user}}, use flowing third-person prose without "Name: dialogue" script format, establish each new scene, keep NPCs consistent and limited to what they know, follow the lorebooks, and end each turn on a pause for the player. It is added at the top of the prompt.
+
+With it in place, the character card no longer needs GM instructions. Use the card for a short **setting blurb** instead, such as era and technology level, place, premise, tone and major themes. If your Main Prompt (or the card's Main Prompt override) still holds older GM rules, switch it off in the analyzer and save the arrangement so the two don't contradict each other.
 
 ### Where a block goes
 

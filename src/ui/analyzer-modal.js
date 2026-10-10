@@ -26,6 +26,7 @@ import {
 } from '../injections/store.js';
 import { INJECTION_PRESETS } from '../injections/presets.js';
 import { getInjectionProviders, getProviderBlocks } from '../injections/providers.js';
+import { getUserPresets, saveUserPreset, deleteUserPreset } from '../injections/user-presets.js';
 
 const compiler = new CuratorCompiler();
 
@@ -373,11 +374,25 @@ function renderAll() {
 function renderAddMenu() {
     const select = root.querySelector('.cr-lib-add');
     const presets = INJECTION_PRESETS.map(p => `<option value="preset:${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`).join('');
+    const mine = getUserPresets();
+    const minePresets = mine.length
+        ? mine.map(p => `<option value="user:${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`).join('')
+        : '<option disabled>(none yet - use the bookmark on a block)</option>';
     const offered = providerOffers.map(({ provider, blocks }) => `
         <optgroup label="${escapeHtml(provider.name)}">${blocks.length
         ? blocks.map(b => `<option value="provider:${escapeHtml(provider.id)}:${escapeHtml(b.id)}">${escapeHtml(b.name)}</option>`).join('')
         : '<option disabled>(nothing offered right now)</option>'}</optgroup>`).join('');
-    select.innerHTML = `<option value="">Add from...</option><optgroup label="Curator presets">${presets}</optgroup>${offered}`;
+    select.innerHTML = `<option value="">Add a block...</option><option value="blank">Blank block (write your own)</option><optgroup label="My presets">${minePresets}</optgroup><optgroup label="Curator presets">${presets}</optgroup>${offered}`;
+
+    const manager = root.querySelector('.cr-mypresets');
+    manager.hidden = !mine.length;
+    manager.querySelector('summary').textContent = `My presets (${mine.length})`;
+    manager.querySelector('ul').innerHTML = mine.map(p => `
+        <li data-preset-id="${escapeHtml(p.id)}" title="${escapeHtml(p.text)}">
+            <i class="fa-solid fa-square" style="color:${escapeHtml(p.color || DEFAULT_COLOR)}"></i>
+            <span>${escapeHtml(p.name)}</span>
+            <div class="menu_button fa-solid fa-trash-can cr-mypreset-delete" title="Delete this preset (blocks made from it are kept)"></div>
+        </li>`).join('');
 }
 
 function renderLibrary() {
@@ -398,6 +413,7 @@ function renderLibrary() {
                     <input type="checkbox" class="cr-lib-enabled" ${b.enabled ? 'checked' : ''} title="Enabled - sent with every Chat Completion prompt" />
                     <span class="cr-lib-name" title="${escapeHtml(b.name)}">${escapeHtml(b.name)}</span>
                     <div class="menu_button fa-solid fa-pen cr-lib-edit" title="Edit"></div>
+                    <div class="menu_button fa-solid fa-bookmark cr-lib-save-preset" title="Save as my preset - reusable from the Add menu"></div>
                     <div class="menu_button fa-solid fa-clone cr-lib-clone" title="Clone"></div>
                     <div class="menu_button fa-solid fa-trash-can cr-lib-delete" title="Delete"></div>
                 </div>
@@ -435,9 +451,22 @@ async function loadProviderOffers() {
     if (root) renderAddMenu();
 }
 
+// A new empty block, enabled, with its editor open. It is only sent once
+// it has text.
+async function addBlankBlock() {
+    const block = createInjection({ name: 'New injection block', enabled: true });
+    editingInjection = block.id;
+    await afterLibraryChange();
+    toastr.info('Blank block added before Chat History - write its text in the Injection Blocks panel, then drag it where you want it.', 'Curator');
+}
+
 async function addFromMenu(value) {
+    if (value === 'blank') return addBlankBlock();
     let block = null;
-    if (value.startsWith('preset:')) {
+    if (value.startsWith('user:')) {
+        const preset = getUserPresets().find(p => `user:${p.id}` === value);
+        if (preset) block = createInjection({ name: preset.name, text: preset.text, role: preset.role, color: preset.color, source: { userPreset: preset.id } });
+    } else if (value.startsWith('preset:')) {
         const preset = INJECTION_PRESETS.find(p => `preset:${p.id}` === value);
         if (preset) block = createInjection({ ...preset, source: { preset: preset.id } });
     } else if (value.startsWith('provider:')) {
@@ -447,7 +476,8 @@ async function addFromMenu(value) {
         if (offer) block = createInjection({ ...offer, source: { provider: providerId, id: offer.id } });
     }
     if (block) {
-        toastr.success(`Added "${block.name}" - placed before Chat History. Drag it where you want it.`, 'Curator');
+        const where = block.anchor === '^' ? 'at the top of the prompt' : 'before Chat History';
+        toastr.success(`Added "${block.name}" ${where}. Drag it where you want it.`, 'Curator');
         await afterLibraryChange();
     }
 }
@@ -676,6 +706,15 @@ function wireEvents() {
             } else if (e.target.closest('.cr-lib-done')) {
                 editingInjection = null;
                 renderLibrary();
+            } else if (e.target.closest('.cr-lib-save-preset')) {
+                const block = getInjection(id);
+                if (block && !block.text.trim()) {
+                    toastr.warning('Write some text first - an empty block makes an empty preset.', 'Curator');
+                } else if (block) {
+                    const { replaced } = saveUserPreset(block);
+                    toastr.success(`${replaced ? 'Updated' : 'Saved'} "${block.name}" in My presets.`, 'Curator');
+                    renderAddMenu();
+                }
             } else if (e.target.closest('.cr-lib-clone')) {
                 const copy = cloneInjection(id);
                 if (copy) toastr.success(`Cloned to "${copy.name}".`, 'Curator');
@@ -688,6 +727,13 @@ function wireEvents() {
                     await afterLibraryChange();
                 }
             }
+            return;
+        }
+
+        const presetRow = e.target.closest('[data-preset-id]');
+        if (presetRow && e.target.closest('.cr-mypreset-delete')) {
+            deleteUserPreset(presetRow.dataset.presetId);
+            renderAddMenu();
             return;
         }
 
@@ -863,13 +909,9 @@ async function runAction(action) {
             await rebuildFromCapture();
             toastr.info('Arrangement cleared - back to SillyTavern\'s own order.', 'Curator');
             break;
-        case 'new-injection': {
-            const block = createInjection({ name: 'New injection block', enabled: false });
-            editingInjection = block.id;
-            await afterLibraryChange();
-            toastr.info('New block created switched off - write its text, then enable it and drag it into place.', 'Curator');
+        case 'new-injection':
+            await addBlankBlock();
             break;
-        }
     }
 }
 
@@ -917,10 +959,11 @@ function buildRoot() {
                 </div>
                 <div class="cr-lib">
                     <div class="cr-side-head"><b><i class="fa-solid fa-syringe"></i> Injection Blocks</b>
-                        <div class="menu_button fa-solid fa-plus" data-action="new-injection" title="New injection block"></div></div>
+                        <div class="menu_button menu_button_icon" data-action="new-injection" title="Add a blank block and write your own text"><i class="fa-solid fa-plus"></i><span>Blank</span></div></div>
                     <small class="cr-hint">Global - shared by every chat. Keep them setting-agnostic: setting details belong in the character, persona, scenario or lorebooks.</small>
                     <small class="cr-hint cr-lib-note" hidden>Injection blocks are sent with Chat Completion prompts only, and are shown in the prompt for live analyses.</small>
-                    <select class="text_pole cr-lib-add" title="Add a ready-made block"></select>
+                    <select class="text_pole cr-lib-add" title="Add a blank block, one of your presets, or a ready-made one"></select>
+                    <details class="cr-mypresets" hidden><summary></summary><ul></ul></details>
                     <ol class="cr-lib-list"></ol>
                 </div>
                 <div class="cr-side-head"><b><i class="fa-solid fa-book-atlas"></i> Connected Lorebooks</b></div>

@@ -504,3 +504,34 @@
     width: 100%;
     resize: vertical;
 }
+
+.cr-modal .cr-mypresets summary {
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.cr-modal .cr-mypresets ul {
+    list-style: none;
+    margin: 4px 0;
+    padding: 0;
+}
+
+.cr-modal .cr-mypresets li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.9em;
+}
+
+.cr-modal .cr-mypresets li span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cr-modal .cr-mypresets .menu_button {
+    padding: 3px;
+    margin: 0;
+}
