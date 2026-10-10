@@ -1,0 +1,62 @@
+<div id="curator_settings">
+    <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+            <b>Curator</b>
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+        </div>
+        <div class="inline-drawer-content">
+
+            <div class="cr-settings-row">
+                <label class="checkbox_label" title="Capture each prompt SillyTavern builds so Curator can analyze it.">
+                    <input id="cr_enabled" type="checkbox" />
+                    <span>Enable Curator</span>
+                </label>
+            </div>
+            <small id="cr_status" class="cr-hint"></small>
+
+            <hr class="sysHR" />
+
+            <div class="cr-section">
+                <div class="cr-heading">
+                    <i class="fa-solid fa-magnifying-glass-chart"></i>
+                    <b>Prompt Analyzer</b>
+                </div>
+                <small id="cr_capture_info" class="cr-hint">No prompt captured yet - send a message (or open a chat) first.</small>
+                <div class="cr-actions">
+                    <div id="cr_analyze" class="menu_button menu_button_icon" title="Split the last captured prompt into blocks">
+                        <i class="fa-solid fa-magnifying-glass"></i><span>Analyze Last Prompt</span>
+                    </div>
+                    <div id="cr_compile" class="menu_button menu_button_icon" title="Rebuild the prompt from the enabled blocks">
+                        <i class="fa-solid fa-gears"></i><span>Compile</span>
+                    </div>
+                    <div id="cr_clear" class="menu_button menu_button_icon" title="Discard the current snapshot">
+                        <i class="fa-solid fa-eraser"></i><span>Clear</span>
+                    </div>
+                </div>
+                <small id="cr_snapshot_info" class="cr-hint"></small>
+                <div id="cr_block_list" class="cr-block-list"></div>
+                <div id="cr_compiled_wrap" class="cr-compiled-wrap" hidden>
+                    <b>Compiled prompt</b>
+                    <textarea id="cr_compiled" class="text_pole textarea_compact" rows="8" readonly></textarea>
+                </div>
+            </div>
+
+            <hr class="sysHR" />
+
+            <div class="cr-section">
+                <div class="cr-heading">
+                    <i class="fa-solid fa-camera"></i>
+                    <b>Snapshots</b>
+                </div>
+                <small class="cr-hint">Saved analyses, shared across all chats.</small>
+                <div class="cr-actions">
+                    <div id="cr_save_snapshot" class="menu_button menu_button_icon" title="Save the current snapshot">
+                        <i class="fa-solid fa-floppy-disk"></i><span>Save Snapshot</span>
+                    </div>
+                </div>
+                <div id="cr_snapshot_list" class="cr-snapshot-list"></div>
+            </div>
+
+        </div>
+    </div>
+</div>

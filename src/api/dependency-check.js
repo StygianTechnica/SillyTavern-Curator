@@ -1,5 +1,5 @@
-// Detects whether the State Engine extension is installed, enabled, and
-// has actually finished initializing - WITHOUT hardcoding or probing any
+// Detects whether the OPTIONAL State Engine extension is installed,
+// enabled, and has actually finished initializing - WITHOUT hardcoding or probing any
 // file path. The signal used is `window.StateEngineWI`, a global the
 // REAL State Engine extension sets for ITSELF once its own startup
 // sequence completes (SillyTavern-StateEngine/src/world-info/wi-api.js,
@@ -55,37 +55,4 @@ export async function ensureStateEngineAvailable() {
     if (stateEnginePresent()) return true;
     await waitForAppReady();
     return stateEnginePresent();
-}
-
-// A single, plain-language popup telling the user this extension needs
-// the State Engine extension installed and enabled - shown at MOST once
-// per page load, however many times this is called (see the `warned`
-// guard below). Prefers SillyTavern's own Popup UI when available (the
-// same try-Popup-then-fall-back pattern State Engine's own
-// initialization-engine.js uses), but a plain `window.alert()` is the
-// GUARANTEED path - it cannot itself fail in a way that would defeat
-// "must not crash", unlike guessing at Popup's option shape.
-let warned = false;
-
-export function warnStateEngineMissing() {
-    if (warned) return;
-    warned = true;
-
-    const message = 'This extension needs the "State Engine" extension to work, and it could not be found. Please install and enable SillyTavern-StateEngine, then reload the page.';
-
-    try {
-        const context = SillyTavern.getContext();
-        if (context?.Popup && context?.POPUP_TYPE) {
-            const shown = new context.Popup(`<h3>State Engine Required</h3><p>${message}</p>`, context.POPUP_TYPE.TEXT, '', { okButton: 'OK' }).show();
-            // .show() may return a Promise (dismissed/rejected asynchronously,
-            // not a synchronous throw this try/catch would already catch) -
-            // fall back to the guaranteed alert rather than risk the user
-            // seeing no popup at all if it rejects.
-            if (shown && typeof shown.catch === 'function') shown.catch(() => window.alert(message));
-            return;
-        }
-    } catch {
-        // Fall through to the guaranteed path below.
-    }
-    window.alert(message);
 }

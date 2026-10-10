@@ -4,10 +4,11 @@
     "description": "An extension for SillyTavern to provide tools for analyzing and controlling LLM context usage in requests. Interacts with State-Engine if it is installed but does not require it.",
     "version": "0.1.0",
     "js": "src/index.js",
+    "css": "style.css",
     "loading_order": 100,
     "requires": [],
     "optional": [],
-    "author": "",
-    "homePage": "https://github.com/StygianTechnica/SillyTavern-Curator.git",
+    "author": "StygianTechnica",
+    "homePage": "https://github.com/StygianTechnica/SillyTavern-Curator",
     "auto_update": false
 }

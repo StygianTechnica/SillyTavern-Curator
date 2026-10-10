@@ -1,0 +1,77 @@
+#curator_settings .cr-settings-row,
+#curator_settings .cr-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+#curator_settings .cr-heading {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+#curator_settings .cr-hint {
+    opacity: 0.7;
+}
+
+#curator_settings .cr-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+#curator_settings .cr-block-list,
+#curator_settings .cr-snapshot-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+#curator_settings .cr-block {
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 6px;
+    padding: 4px 6px;
+}
+
+#curator_settings .cr-block.cr-disabled {
+    opacity: 0.5;
+}
+
+#curator_settings .cr-block-header,
+#curator_settings .cr-snapshot {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+#curator_settings .cr-block-label,
+#curator_settings .cr-snapshot-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#curator_settings .cr-block-length {
+    opacity: 0.6;
+    font-size: 0.85em;
+}
+
+#curator_settings .cr-block textarea {
+    width: 100%;
+    margin-top: 4px;
+}
+
+#curator_settings .cr-compiled-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#curator_settings .cr-compiled-wrap[hidden] {
+    display: none;
+}

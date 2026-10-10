@@ -3,6 +3,6 @@
     "version": "0.1.0",
     "private": true,
     "type": "module",
-    "description": "Blank template for building a SillyTavern extension that integrates with the State Engine API.",
+    "description": "Tools for analyzing and controlling LLM context usage in SillyTavern requests. Works standalone; integrates with State Engine when installed.",
     "license": "SEE LICENSE IN LICENSE"
 }

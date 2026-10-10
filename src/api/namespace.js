@@ -12,7 +12,8 @@
 // file: a static import is resolved when the module graph loads, before
 // src/api/dependency-check.js ever gets a chance to run its own check -
 // if the path doesn't resolve (State Engine genuinely not installed),
-// that would crash the whole extension outright. A dynamic import only
+// that would crash the whole extension outright - and Curator must run
+// without State Engine. A dynamic import only
 // runs, and only fails, when claimNamespace() is actually called - which
 // src/extension.js only does after confirming State Engine is present.
 const API_PATH = '../../../SillyTavern-StateEngine/src/api/index.js';

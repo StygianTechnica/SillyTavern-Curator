@@ -1,4 +1,33 @@
-// storage.js 
+// storage.js
+//
+// Curator's data lives in a small virtual file store inside its
+// extension settings (see src/settings.js), addressed by path like
+// "snapshots/<id>.json". The helpers below are the only place that
+// knows this; everything else just reads and writes "files".
+
+import { getSettings as getCuratorSettings, saveSettings as persistCuratorSettings } from '../settings.js';
+
+async function readJSON(path) {
+    const value = getCuratorSettings().files[path];
+    return value === undefined ? null : structuredClone(value);
+}
+
+async function writeJSON(path, data) {
+    getCuratorSettings().files[path] = structuredClone(data);
+    persistCuratorSettings();
+}
+
+async function listFiles(dir) {
+    const prefix = `${dir}/`;
+    return Object.keys(getCuratorSettings().files)
+        .filter(path => path.startsWith(prefix))
+        .map(path => path.slice(prefix.length));
+}
+
+async function deleteFile(path) {
+    delete getCuratorSettings().files[path];
+    persistCuratorSettings();
+}
 
 // -----------------------------
 // PROMPTS

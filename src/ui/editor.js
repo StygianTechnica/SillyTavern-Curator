@@ -36,7 +36,7 @@ export function onEditBlockText(blockId, newText) {
     block.text = newText;
 
     // Re-render the editor UI
-    renderSnapshot(snapshot);     // TODO: your UI renderer
+    renderSnapshot(snapshot);
 }
 
 
@@ -54,7 +54,7 @@ export function onToggleBlock(blockId, enabled) {
 
     block.enabled = enabled;
 
-    renderSnapshot(snapshot);     // TODO: your UI renderer
+    renderSnapshot(snapshot);
 }
 
 
@@ -75,7 +75,7 @@ export function onReorderBlock(blockId, newOrder) {
     // Re-sort blocks in the snapshot
     snapshot.blocks.sort((a, b) => a.order - b.order);
 
-    renderSnapshot(snapshot);     // TODO: your UI renderer
+    renderSnapshot(snapshot);
 }
 
 
@@ -88,7 +88,7 @@ export async function onRecompile() {
 
     const finalText = await compileSnapshot(snapshot);
 
-    renderCompiledText(finalText); // TODO: your UI renderer
+    renderCompiledText(finalText);
 }
 
 
@@ -98,5 +98,5 @@ export async function onRecompile() {
  */
 export function loadSnapshotIntoEditor(snapshot) {
     setSnapshot(snapshot);
-    renderSnapshot(snapshot);      // TODO: your UI renderer
+    renderSnapshot(snapshot); 
 }

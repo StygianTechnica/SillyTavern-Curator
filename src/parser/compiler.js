@@ -2,8 +2,6 @@
 
 import { PromptSnapshot } from '../models/PromptSnapshot.js';
 import { PromptBlock } from '../models/PromptSnapshot.js';
-import { Snippet } from '../models/Snippet.js';
-import { Prompt } from '../models/Prompt.js';
 
 /**
  * Curator Compiler
