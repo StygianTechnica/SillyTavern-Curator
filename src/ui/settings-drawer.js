@@ -12,7 +12,8 @@ import {
     onDeleteSnapshot,
     refreshSnapshotList,
 } from './panel.js';
-import { testCurrentPrompt } from './analyzer-modal.js';
+import { testCurrentPrompt, diagnoseCurrentPrompt } from './analyzer-modal.js';
+import { getDiagnosticsSettings } from './diagnostics-modal.js';
 import { mountConnectionForm } from './connection-form.js';
 
 // SillyTavern resolves extension templates relative to
@@ -83,6 +84,17 @@ export async function addSettingsDrawer(stateEngineStatus) {
     document.getElementById('cr_analyze').addEventListener('click', () => onAnalyzePrompt());
     document.getElementById('cr_test_prompt').addEventListener('click', () => testCurrentPrompt());
     mountConnectionForm(document.getElementById('cr_tester_conn'));
+
+    const question = document.getElementById('cr_diag_question');
+    question.value = getDiagnosticsSettings().question;
+    question.addEventListener('change', () => {
+        getDiagnosticsSettings().question = question.value;
+        saveSettings();
+    });
+    document.getElementById('cr_diagnose_prompt').addEventListener('click', async () => {
+        await diagnoseCurrentPrompt(question.value);
+        question.value = getDiagnosticsSettings().question;
+    });
 
     document.getElementById('cr_snapshot_list').addEventListener('click', (e) => {
         const id = e.target.closest('.cr-snapshot')?.dataset.snapshotId;

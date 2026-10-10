@@ -15,7 +15,7 @@ Press **Test Prompt**:
 - in the **Prompt Analyzer** toolbar, to test the prompt exactly as arranged there, including unsaved changes
 - in Curator's **drawer**, to test the current chat's prompt as Curator would send it (saved arrangement, injection blocks, State Engine variables)
 
-The tester opens and runs once straight away. The compiled prompt is sent as **one user message**.
+The tester opens with the compiled prompt and your connection. Nothing is sent until you press **Run**. The compiled prompt is sent as **one user message**.
 
 Each run becomes a result card showing:
 - the model's response, plus its reasoning when the model returns one

@@ -36,6 +36,22 @@ Turns
 - End each response at a natural pause where {{user}} can act or respond. Never decide or resolve {{user}}'s choices.`,
     },
     {
+        // Written for State Engine's prompted scene variables (time, date,
+        // location, weather...): those are filled by reading the latest
+        // response, so they can only capture what the narration states.
+        id: 'scene-details',
+        name: 'Scene details (time, place, weather)',
+        role: 'system',
+        color: '#5c6bc0',
+        text: `Keep the scene's facts explicit in the narration, so the reader always knows where and when the story is:
+- Time: when a scene begins and whenever time passes, state the time of day (dawn, midday, dusk, night) or the clock time, and how much time has passed ("an hour later", "the next morning").
+- Date: when a new day begins or the date matters, name the day, date, or season.
+- Location: name where the characters are, as specifically as the story allows (city or region, then the building or room), and say so plainly whenever they move.
+- Weather and conditions: describe the weather, light, and temperature when a scene opens outdoors or when they change.
+- Presence: make clear who is in the scene, and when someone arrives or leaves.
+State each fact once, in a natural sentence, when it is first established or when it changes. Do not repeat unchanged details in every response, and never contradict a detail that has already been established.`,
+    },
+    {
         id: 'no-user-actions',
         name: 'Never act for the user',
         role: 'system',

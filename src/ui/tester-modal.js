@@ -114,7 +114,7 @@ function buildRoot(meta) {
                 <div class="cr-side-head"><b>Connection</b></div>
                 <div class="cr-tester-conn"></div>
                 <div class="cr-tester-actions">
-                    <div class="menu_button menu_button_icon" data-action="run"><i class="fa-solid fa-play"></i><span>Run</span></div>
+                    <div class="menu_button menu_button_icon cr-primary" data-action="run" title="Send the compiled prompt to the selected connection"><i class="fa-solid fa-play"></i><span>Run</span></div>
                     <small class="cr-run-target cr-hint"></small>
                     <div class="menu_button menu_button_icon" data-action="cancel" hidden><i class="fa-solid fa-stop"></i><span>Cancel</span></div>
                 </div>
@@ -161,11 +161,12 @@ function wire() {
 }
 
 /**
- * Opens the Prompt Tester on `compiledPrompt` and runs it once straight away.
+ * Opens the Prompt Tester on `compiledPrompt`. Nothing is sent until the
+ * user presses Run.
  * @param {string} compiledPrompt
- * @param {{ meta?: string, autoRun?: boolean }} options
+ * @param {{ meta?: string }} options
  */
-export async function openTesterModal(compiledPrompt, { meta = '', autoRun = true } = {}) {
+export async function openTesterModal(compiledPrompt, { meta = '' } = {}) {
     prompt = String(compiledPrompt ?? '');
     refreshConnectionForms();
     results = [];
@@ -187,8 +188,6 @@ export async function openTesterModal(compiledPrompt, { meta = '', autoRun = tru
         leftAlign: true,
         onClose: () => running?.abort(),
     });
-    const shown = popup.show();
-    if (autoRun && prompt.trim()) void run();
-    await shown;
+    await popup.show();
     root = null;
 }

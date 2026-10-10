@@ -18,6 +18,11 @@ const DEFAULTS = {
     // State Engine variables offered for injection by other extensions:
     // { [qualifiedName]: { enabled, anchor, role } } (src/injections/variables.js).
     variableInjections: {},
+    // Prompt Diagnostics: last question and report length (src/ui/diagnostics-modal.js).
+    diagnostics: {
+        question: '',
+        maxTokens: 2048,
+    },
     // Prompt Tester connection (src/tester/connection.js): a SillyTavern
     // Connection Profile ('' = the active connection) and optional overrides.
     llmConnection: {

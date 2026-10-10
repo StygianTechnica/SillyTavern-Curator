@@ -45,6 +45,20 @@
 
             <div class="cr-section">
                 <div class="cr-heading">
+                    <i class="fa-solid fa-stethoscope"></i>
+                    <b>Prompt Diagnostics</b>
+                </div>
+                <small class="cr-hint">Ask a model about the current prompt - conflicts, ambiguities, ordering, token pressure. Uses the Prompt Tester's connection; a sandbox call.</small>
+                <textarea id="cr_diag_question" class="text_pole" rows="3" placeholder="e.g. Why does the model keep writing actions for my character?"></textarea>
+                <div id="cr_diagnose_prompt" class="menu_button menu_button_icon" title="Compile the current prompt and ask the question about it">
+                    <i class="fa-solid fa-stethoscope"></i><span>Diagnose Prompt</span>
+                </div>
+            </div>
+
+            <hr class="sysHR" />
+
+            <div class="cr-section">
+                <div class="cr-heading">
                     <i class="fa-solid fa-camera"></i>
                     <b>Snapshots</b>
                 </div>

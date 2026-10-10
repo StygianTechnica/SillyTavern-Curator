@@ -19,4 +19,7 @@ Global blocks of your own text, sent with every Chat Completion prompt in every 
 **Save Arrangement** stores the order, on/off state and edited text of each section. With **Curator controls prompt order** on, every Chat Completion prompt is rearranged that way just before it is sent - overriding the prompt manager. Sections Curator hasn't seen before keep their place after their neighbour. Raw generations from other extensions (trackers etc.) are never touched. Edited text replaces that section on *every* generation, so prefer editing static sections (Main Prompt, custom prompts).
 
 ## Prompt Tester
-**Test Prompt** (analyzer toolbar or drawer) runs the compiled prompt against SillyTavern's active connection or any of its Connection Profiles (like State Engine), in a sandbox: nothing reaches the chat and no other extension sees the call. Switch profiles and run again to compare responses side by side. See [docs/prompt-tester.md](docs/prompt-tester.md).
+**Test Prompt** (analyzer toolbar or drawer) runs the compiled prompt against SillyTavern's active connection or any of its Connection Profiles (like State Engine), in a sandbox: nothing reaches the chat and no other extension sees the call. Switch profiles and run again to compare responses side by side. Nothing is sent until you press **Run**. See [docs/prompt-tester.md](docs/prompt-tester.md).
+
+## Prompt Diagnostics
+Ask a model a question about the prompt (**Diagnose Prompt** in the drawer, or **Diagnose** in the analyzer) and get a structured report: diagnosis, suggested fixes, conflicts, ambiguities, missing instructions, token pressure and ordering issues. Uses the Prompt Tester's connection, in the same sandbox. See [docs/prompt-diagnostics.md](docs/prompt-diagnostics.md).

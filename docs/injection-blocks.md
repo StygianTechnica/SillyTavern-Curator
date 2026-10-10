@@ -45,6 +45,12 @@ A block like "The city of Brass is ruled by guilds" would leak into every other 
 
 With it in place, the character card no longer needs GM instructions. Use the card for a short **setting blurb** instead, such as era and technology level, place, premise, tone and major themes. If your Main Prompt (or the card's Main Prompt override) still holds older GM rules, switch it off in the analyzer and save the arrangement so the two don't contradict each other.
 
+### The Scene details preset
+
+**Scene details (time, place, weather)** asks the model to state the scene's facts plainly whenever they're established or change: time of day and time passed, the date or day, the specific location, weather and conditions, and who is present. It also tells the model not to repeat unchanged details.
+
+It's meant for State Engine's **prompted** scene variables. Those are filled by reading the latest response, so they can only capture what the narration actually says. It pairs well with the GM Card, whose scene rule covers *when* to set a scene; this one makes the facts explicit enough to capture.
+
 ### Where a block goes
 
 Each block remembers the section directly above it. If that section isn't in a particular prompt (an empty Author's Note, say), the block falls back to just before Chat History. Blocks you've never dragged sit just before Chat History too.

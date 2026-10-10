@@ -47,10 +47,14 @@ function errorMessage(error) {
 }
 
 /**
- * @param {string} prompt - the compiled prompt
- * @param {{ signal?: AbortSignal }} options
+ * One sandboxed call with `prompt` as the single user message. Shared by
+ * the Prompt Tester and Prompt Diagnostics.
+ * @param {string} prompt
+ * @param {{ signal?: AbortSignal, maxTokens?: number|null }} options -
+ *   maxTokens: used when the connection has no max-token override (e.g.
+ *   Diagnostics' longer report length)
  */
-export async function runPromptTest(prompt, { signal = null } = {}) {
+export async function runPromptTest(prompt, { signal = null, maxTokens = null } = {}) {
     const startedAt = Date.now();
     const conn = getConnection();
     let request = null;
@@ -69,6 +73,7 @@ export async function runPromptTest(prompt, { signal = null } = {}) {
     try {
         resolved = resolveConnection(conn);
         if (resolved.error) return fail(resolved.error);
+        if (resolved.max_tokens === null && maxTokens) resolved = { ...resolved, max_tokens: maxTokens };
         const context = SillyTavern.getContext();
         let json;
 

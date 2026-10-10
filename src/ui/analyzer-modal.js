@@ -31,6 +31,7 @@ import {
 import { isStateEngineConnected } from '../api/connection.js';
 import { PromptSnapshot } from '../models/PromptSnapshot.js';
 import { openTesterModal } from './tester-modal.js';
+import { openDiagnosticsModal } from './diagnostics-modal.js';
 import { INJECTION_PRESETS } from '../injections/presets.js';
 import { getInjectionProviders, getProviderBlocks } from '../injections/providers.js';
 import { getUserPresets, saveUserPreset, deleteUserPreset } from '../injections/user-presets.js';
@@ -986,6 +987,9 @@ async function runAction(action) {
         case 'test-prompt':
             await testPrompt();
             break;
+        case 'diagnose-prompt':
+            await diagnosePrompt();
+            break;
         case 'compile': {
             const text = await onRecompile();
             const panel = root.querySelector('.cr-compiled');
@@ -1038,7 +1042,9 @@ async function runAction(action) {
 // -----------------------------------------------------------------
 
 // The prompt as compiled here, with injection blocks' macros resolved the
-// way they are when sent. Works on a copy - the snapshot is not changed.
+// way they are when sent, plus what Diagnostics needs to know about it.
+// Works on a copy - the snapshot is not changed.
+//   { text, tokens, sections: [{ label, category, role, tokens }], contextSize, targetModel, meta }
 async function compileForTest(snapshot = getSnapshot()) {
     const copy = PromptSnapshot.fromJSON(JSON.parse(JSON.stringify(snapshot.toJSON())));
     for (const block of copy.blocks) {
@@ -1047,36 +1053,73 @@ async function compileForTest(snapshot = getSnapshot()) {
         if (injection) block.text = resolvedText(injection);
     }
     const text = compiler.compile(copy);
-    return { text, tokens: compiler.countTokens(copy) };
+    const tokens = compiler.countTokens(copy);
+    const sections = [...copy.blocks]
+        .filter(b => b.enabled)
+        .sort((a, b) => a.order - b.order)
+        .map(b => ({ label: b.label, category: CATEGORIES[b.category] ?? b.category, role: b.role, tokens: blockTokens(b) }));
+    return {
+        text,
+        tokens,
+        sections,
+        contextSize: snapshot.meta.contextSize || 0,
+        targetModel: snapshot.meta.model || null,
+        meta: `${fmt(tokens)} tokens · ${fmt(text.length)} characters`,
+    };
 }
 
 async function testPrompt(snapshot = getSnapshot()) {
-    const { text, tokens } = await compileForTest(snapshot);
-    if (!text.trim()) {
+    const compiled = await compileForTest(snapshot);
+    if (!compiled.text.trim()) {
         toastr.warning('The compiled prompt is empty - nothing to test.', 'Curator');
         return;
     }
-    await openTesterModal(text, { meta: `${fmt(tokens)} tokens · ${fmt(text.length)} characters` });
+    await openTesterModal(compiled.text, { meta: compiled.meta });
 }
 
-/**
- * Test Prompt from outside the analyzer (Curator's drawer): analyses the
- * last prompt - building one with a dry run if needed - arranges it exactly
- * as the analyzer would (saved arrangement, injection blocks, State Engine
- * variables), compiles it and opens the Prompt Tester.
- */
-export async function testCurrentPrompt() {
+async function diagnosePrompt(snapshot = getSnapshot(), options = {}) {
+    const compiled = await compileForTest(snapshot);
+    if (!compiled.text.trim()) {
+        toastr.warning('The compiled prompt is empty - nothing to diagnose.', 'Curator');
+        return;
+    }
+    await openDiagnosticsModal(compiled, options);
+}
+
+// The current chat's prompt as Curator would send it: analyses the last
+// prompt (building one with a dry run if needed) and arranges it exactly
+// as the analyzer would (saved arrangement, injection blocks, State Engine
+// variables). Null if no prompt could be built.
+async function prepareCurrentSnapshot() {
     const capture = getLastPrompt() ?? await refreshPrompt();
     if (!capture) {
         toastr.info('No prompt available yet - open a chat first.', 'Curator');
-        return;
+        return null;
     }
     const snapshot = await analyzePrompt(capture);
     setSnapshot(snapshot);
     live = true;
     await loadVariableBank();
     if (snapshot.meta.kind === 'cc') await arrangeSnapshot(snapshot);
-    await testPrompt(snapshot);
+    return snapshot;
+}
+
+/**
+ * Test Prompt from outside the analyzer (Curator's drawer).
+ */
+export async function testCurrentPrompt() {
+    const snapshot = await prepareCurrentSnapshot();
+    if (snapshot) await testPrompt(snapshot);
+}
+
+/**
+ * Diagnose Prompt from outside the analyzer (Curator's drawer). With a
+ * question, the diagnosis starts straight away.
+ * @param {string} question
+ */
+export async function diagnoseCurrentPrompt(question = '') {
+    const snapshot = await prepareCurrentSnapshot();
+    if (snapshot) await diagnosePrompt(snapshot, question.trim() ? { question: question.trim(), run: true } : {});
 }
 
 // -----------------------------------------------------------------
@@ -1093,6 +1136,7 @@ function buildRoot() {
                 <div class="menu_button menu_button_icon" data-action="refresh" title="Rebuild the prompt for the current chat now (dry run - nothing is sent)"><i class="fa-solid fa-rotate"></i><span>Refresh</span></div>
                 <div class="menu_button menu_button_icon" data-action="compile" title="Show the prompt as arranged here"><i class="fa-solid fa-gears"></i><span>Compile</span></div>
                 <div class="menu_button menu_button_icon" data-action="test-prompt" title="Compile the prompt as arranged here and run it against a model - a sandbox call, nothing reaches the chat"><i class="fa-solid fa-flask"></i><span>Test Prompt</span></div>
+                <div class="menu_button menu_button_icon" data-action="diagnose-prompt" title="Ask a model a question about the prompt as arranged here - e.g. why the model keeps doing something"><i class="fa-solid fa-stethoscope"></i><span>Diagnose</span></div>
                 <div class="menu_button menu_button_icon" data-action="save-snapshot" title="Save this analysis"><i class="fa-solid fa-camera"></i><span>Snapshot</span></div>
                 <div class="menu_button fa-solid fa-angles-down" data-action="expand-all" title="Expand all"></div>
                 <div class="menu_button fa-solid fa-angles-up" data-action="collapse-all" title="Collapse all"></div>
