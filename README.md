@@ -17,3 +17,6 @@ Global blocks of your own text, sent with every Chat Completion prompt in every 
 
 ## Curator controls prompt order (Chat Completion)
 **Save Arrangement** stores the order, on/off state and edited text of each section. With **Curator controls prompt order** on, every Chat Completion prompt is rearranged that way just before it is sent - overriding the prompt manager. Sections Curator hasn't seen before keep their place after their neighbour. Raw generations from other extensions (trackers etc.) are never touched. Edited text replaces that section on *every* generation, so prefer editing static sections (Main Prompt, custom prompts).
+
+## Prompt Tester
+**Test Prompt** (analyzer toolbar or drawer) runs the compiled prompt against SillyTavern's active connection or any of its Connection Profiles (like State Engine), in a sandbox: nothing reaches the chat and no other extension sees the call. Switch profiles and run again to compare responses side by side. See [docs/prompt-tester.md](docs/prompt-tester.md).

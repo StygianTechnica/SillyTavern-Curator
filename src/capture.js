@@ -20,6 +20,7 @@
 import { getSettings } from './settings.js';
 import { flattenMessages, buildOutgoing, contentText } from './prompt/sections.js';
 import { getInjections, injectionKey, resolvedText } from './injections/store.js';
+import { buildVariableInjections } from './injections/variables.js';
 
 let lastPrompt = null;
 let openaiModule = null;
@@ -76,6 +77,8 @@ async function onChatCompletionPrompt(data) {
     const injections = getInjections()
         .filter(b => b.enabled && b.text.trim())
         .map(b => ({ key: injectionKey(b.id), anchor: b.anchor, role: b.role, content: resolvedText(b) }));
+    // State Engine variables other extensions offer (only with State Engine).
+    injections.push(...await buildVariableInjections(lastPrompt.chatId));
     const reorder = Boolean(settings.applyLayout && settings.layout);
     if (reorder || injections.length) {
         buildOutgoing(data.chat, leaves, { layout: settings.layout, reorder, injections });

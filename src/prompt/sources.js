@@ -16,6 +16,7 @@ export const CATEGORIES = {
     extension: 'Extensions',
     injection: 'In-chat Injection',
     curator: 'Curator Blocks',
+    stateEngine: 'State Engine Variables',
     other: 'Other',
 };
 

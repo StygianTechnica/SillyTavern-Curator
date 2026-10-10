@@ -15,6 +15,16 @@ const DEFAULTS = {
     injections: [],
     // The user's own reusable injection texts (src/injections/user-presets.js).
     userPresets: [],
+    // State Engine variables offered for injection by other extensions:
+    // { [qualifiedName]: { enabled, anchor, role } } (src/injections/variables.js).
+    variableInjections: {},
+    // Prompt Tester connection (src/tester/connection.js): a SillyTavern
+    // Connection Profile ('' = the active connection) and optional overrides.
+    llmConnection: {
+        profileId: '',
+        temperature: null,
+        max_tokens: null,
+    },
     // Virtual file store used by src/storage/storage.js: path -> JSON value.
     files: {},
 };

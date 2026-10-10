@@ -12,6 +12,8 @@ import {
     onDeleteSnapshot,
     refreshSnapshotList,
 } from './panel.js';
+import { testCurrentPrompt } from './analyzer-modal.js';
+import { mountConnectionForm } from './connection-form.js';
 
 // SillyTavern resolves extension templates relative to
 // public/scripts/extensions/, i.e. "third-party/<folder name>". Derived
@@ -79,6 +81,8 @@ export async function addSettingsDrawer(stateEngineStatus) {
     });
 
     document.getElementById('cr_analyze').addEventListener('click', () => onAnalyzePrompt());
+    document.getElementById('cr_test_prompt').addEventListener('click', () => testCurrentPrompt());
+    mountConnectionForm(document.getElementById('cr_tester_conn'));
 
     document.getElementById('cr_snapshot_list').addEventListener('click', (e) => {
         const id = e.target.closest('.cr-snapshot')?.dataset.snapshotId;

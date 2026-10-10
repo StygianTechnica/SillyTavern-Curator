@@ -14,17 +14,16 @@ import { initPromptCapture } from './capture.js';
 import { addSettingsDrawer, setStateEngineStatus } from './ui/settings-drawer.js';
 import { registerInjectionProvider, unregisterInjectionProvider } from './injections/providers.js';
 import { getInjections } from './injections/store.js';
+import { EXTENSION_ID, setStateEngineConnected } from './api/connection.js';
 
 // ---------------------------------------------------------------------
 // EXTENSION IDENTITY - rename these before building on this template.
 // See docs/README.md, "Renaming the namespace".
 // ---------------------------------------------------------------------
 
-// Must be unique across every extension that talks to the State Engine
-// API on this SillyTavern install - it is how the State Engine tells
-// your extension's calls apart from anyone else's. Convention: match
-// your extension's own folder/repo name.
-const EXTENSION_ID = 'Curator';
+// EXTENSION_ID (src/api/connection.js) must be unique across every
+// extension that talks to the State Engine API on this SillyTavern
+// install - it is how the State Engine tells Curator's calls apart.
 
 // Prefixes every variable and preset your extension creates through the
 // State Engine (e.g. a variable named "mood" is stored as
@@ -87,6 +86,7 @@ export async function initExtension() {
 
             await declareCapabilities(EXTENSION_ID, CAPABILITIES);
 
+            setStateEngineConnected(true);
             status = 'Connected to State Engine.';
             console.log(`[${EXTENSION_ID}] initialized - namespace "${NAMESPACE}" claimed.`);
         } catch (err) {

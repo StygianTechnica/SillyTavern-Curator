@@ -56,6 +56,12 @@ export function isInjectionKey(key) {
     return typeof key === 'string' && key.startsWith(INJECTION_PREFIX);
 }
 
+// Keys of sections Curator itself adds to a prompt: injection blocks and
+// State Engine variable injections ('var:...', src/injections/variables.js).
+export function isCuratorKey(key) {
+    return isInjectionKey(key) || (typeof key === 'string' && key.startsWith('var:'));
+}
+
 export function idFromKey(key) {
     return isInjectionKey(key) ? key.slice(INJECTION_PREFIX.length) : null;
 }

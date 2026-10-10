@@ -22,8 +22,15 @@ import { findBlock, onEditBlockText, onToggleBlock, onReorderBlocks, onRecompile
 import { onSaveSnapshot } from './panel.js';
 import {
     DEFAULT_COLOR, ROLES, getInjections, getInjection, createInjection, updateInjection, deleteInjection,
-    cloneInjection, reorderInjections, setAnchors, injectionKey, isInjectionKey, idFromKey, resolvedText,
+    cloneInjection, reorderInjections, setAnchors, injectionKey, isInjectionKey, isCuratorKey, idFromKey, resolvedText,
 } from '../injections/store.js';
+import {
+    discoverInjectables, readValues, getVariableSetting, updateVariableSetting, setVariableAnchors,
+    variableKey, isVariableKey, nameFromKey,
+} from '../injections/variables.js';
+import { isStateEngineConnected } from '../api/connection.js';
+import { PromptSnapshot } from '../models/PromptSnapshot.js';
+import { openTesterModal } from './tester-modal.js';
 import { INJECTION_PRESETS } from '../injections/presets.js';
 import { getInjectionProviders, getProviderBlocks } from '../injections/providers.js';
 import { getUserPresets, saveUserPreset, deleteUserPreset } from '../injections/user-presets.js';
@@ -36,6 +43,8 @@ const expanded = new Set();
 let editingInjection = null;
 let providerOffers = [];          // [{ provider, blocks }]
 let analysedOrder = [];           // SillyTavern's own section keys, in its order
+let injectables = [];             // State Engine variables offered for injection
+let variableValues = {};          // { [name]: { text, hasValue } } for this chat
 const find = { query: '', matches: [], index: -1 };
 
 // -----------------------------------------------------------------
@@ -97,7 +106,7 @@ function injectionsSupported() {
 
 function layoutFromSnapshot() {
     return {
-        sections: sortedBlocks().filter(b => !isInjectionKey(b.id)).map(block => {
+        sections: sortedBlocks().filter(b => !isCuratorKey(b.id)).map(block => {
             const section = { key: block.id, enabled: block.enabled };
             if (block.edited && !isGroupKey(block.id)) section.text = block.text;
             return section;
@@ -108,7 +117,7 @@ function layoutFromSnapshot() {
 // Arranges a freshly analysed live snapshot by the saved arrangement and
 // inserts the injection blocks, so the modal shows what is actually sent.
 async function arrangeSnapshot(snapshot) {
-    analysedOrder = snapshot.blocks.filter(b => !isInjectionKey(b.id)).map(b => b.id);
+    analysedOrder = snapshot.blocks.filter(b => !isCuratorKey(b.id)).map(b => b.id);
     const layout = getSettings().layout;
     if (layout) {
         const arranged = arrange(snapshot.blocks.map(block => ({ key: block.id, block })), layout);
@@ -140,15 +149,46 @@ async function injectionBlock(injection) {
     });
 }
 
+// A State Engine variable offered for injection, as a read-only section
+// holding its value in this chat.
+async function variableBlock(variable) {
+    const setting = getVariableSetting(variable.name);
+    const value = variableValues[variable.name] ?? { text: '', hasValue: false };
+    return new PromptBlock({
+        id: variableKey(variable.name),
+        type: 'variable',
+        label: variable.label,
+        category: 'stateEngine',
+        role: setting.role,
+        text: value.text,
+        enabled: setting.enabled,
+        tokens: value.text ? await countTokens(value.text) : 0,
+        provenance: { extensionId: variable.extensionId, variable: variable.name, hasValue: value.hasValue },
+    });
+}
+
+// Discovers the injectable State Engine variables and reads their values
+// for the current chat. Nothing without State Engine.
+async function loadVariableBank() {
+    injectables = await discoverInjectables();
+    const chatId = SillyTavern.getContext().chatId;
+    variableValues = await readValues(chatId, injectables.map(v => v.name));
+}
+
 // Rebuilds the snapshot's injection blocks from the library and places
 // them by their anchors (same rule as the outgoing prompt).
 async function syncInjectionBlocks(snapshot = getSnapshot()) {
     if (!live || snapshot.meta.kind !== 'cc') return;
-    const own = [...snapshot.blocks].filter(b => !isInjectionKey(b.id)).sort((a, b) => a.order - b.order);
+    const own = [...snapshot.blocks].filter(b => !isCuratorKey(b.id)).sort((a, b) => a.order - b.order);
     const injected = [];
     for (const injection of getInjections()) {
         const block = await injectionBlock(injection);
         block.anchor = injection.anchor;
+        injected.push(block);
+    }
+    for (const variable of injectables) {
+        const block = await variableBlock(variable);
+        block.anchor = getVariableSetting(variable.name).anchor;
         injected.push(block);
     }
     snapshot.blocks = placeInjections(own, injected, b => b.id);
@@ -161,16 +201,20 @@ async function syncInjectionBlocks(snapshot = getSnapshot()) {
 // Saves every injection block's place: the key of the block above it.
 function persistInjectionAnchors() {
     const anchors = {};
+    const variableAnchors = {};
     const blocks = sortedBlocks();
     blocks.forEach((block, index) => {
-        if (isInjectionKey(block.id)) anchors[idFromKey(block.id)] = index === 0 ? '^' : blocks[index - 1].id;
+        const anchor = index === 0 ? '^' : blocks[index - 1].id;
+        if (isInjectionKey(block.id)) anchors[idFromKey(block.id)] = anchor;
+        else if (isVariableKey(block.id)) variableAnchors[nameFromKey(block.id)] = anchor;
     });
     setAnchors(anchors);
+    setVariableAnchors(variableAnchors);
 }
 
 function isDirty() {
     if (!injectionsSupported()) return false;
-    const own = sortedBlocks().filter(b => !isInjectionKey(b.id));
+    const own = sortedBlocks().filter(b => !isCuratorKey(b.id));
     const saved = getSettings().layout;
     if (!saved) return own.some(b => !b.enabled || b.edited) || own.map(b => b.id).join('|') !== analysedOrder.join('|');
     const items = own.map(b => ({ key: b.id }));
@@ -191,16 +235,20 @@ function renderRow(block, { child = false } = {}) {
     const pct = percentOf(tokens);
     const isOpen = expanded.has(block.id);
     const injection = isInjectionKey(block.id);
+    const variable = isVariableKey(block.id);
     const toggleTitle = child ? 'Include this message (preview only - not saved)'
-        : injection ? 'Enable this injection block (saved - applies to every chat)' : 'Include this section';
+        : injection ? 'Enable this injection block (saved - applies to every chat)'
+            : variable ? 'Inject this State Engine variable (saved - applies to every chat where it has a value)' : 'Include this section';
     return `
-        <li class="cr-block cr-cat-${escapeHtml(block.category)}${block.enabled ? '' : ' cr-off'}${child ? ' cr-child' : ''}${injection ? ' cr-injection' : ''}" data-id="${escapeHtml(block.id)}"${colorStyle(block)}>
+        <li class="cr-block cr-cat-${escapeHtml(block.category)}${block.enabled ? '' : ' cr-off'}${child ? ' cr-child' : ''}${injection || variable ? ' cr-injection' : ''}" data-id="${escapeHtml(block.id)}"${colorStyle(block)}>
             <div class="cr-block-head">
                 <span class="cr-drag fa-solid fa-grip-vertical" title="Drag to reorder"></span>
                 <input type="checkbox" class="cr-toggle" ${block.enabled ? 'checked' : ''} title="${toggleTitle}" />
                 <span class="cr-chip">${escapeHtml(CATEGORIES[block.category] ?? block.category)}</span>
                 <span class="cr-label" title="${escapeHtml(block.label)}">${escapeHtml(block.label)}</span>
                 ${block.edited ? '<span class="cr-badge" title="Text edited">edited</span>' : ''}
+                ${variable ? `<span class="cr-badge cr-source" title="Offered by this State Engine extension">${escapeHtml(block.provenance?.extensionId ?? '')}</span>` : ''}
+                ${variable && !block.provenance?.hasValue ? '<span class="cr-badge" title="This chat holds no value for it, so nothing is sent">no value</span>' : ''}
                 ${block.role && !child ? `<span class="cr-role">${escapeHtml(block.role)}</span>` : ''}
                 <span class="cr-tokens" title="${pct.toFixed(1)}% of context">${fmt(tokens)} tok</span>
                 <span class="cr-meter" title="${pct.toFixed(1)}% of context"><span style="width:${Math.min(100, pct * 2).toFixed(1)}%"></span></span>
@@ -221,11 +269,13 @@ function renderBody(block) {
         return `${renderNotes(block)}<ol class="cr-children" data-group="${escapeHtml(block.id)}">${[...block.children].sort((a, b) => a.order - b.order).map(c => renderRow(c, { child: true })).join('')}</ol>`;
     }
     const injection = isInjectionKey(block.id);
-    const editable = !block.id.startsWith('chatHistory-') && !block.id.startsWith('dialogueExamples-');
+    const variable = isVariableKey(block.id);
+    const editable = !variable && !block.id.startsWith('chatHistory-') && !block.id.startsWith('dialogueExamples-');
     const actions = [
         block.edited && live ? '<div class="menu_button menu_button_icon cr-revert"><i class="fa-solid fa-rotate-left"></i><span>Revert text</span></div>' : '',
         injectionsSupported() && !injection ? '<div class="menu_button menu_button_icon cr-clone" title="Copy this text into a new global injection block placed right below - for testing changes without touching the original"><i class="fa-solid fa-clone"></i><span>Clone to injection block</span></div>' : '',
         injection ? '<small class="cr-hint">Global injection block - edits are saved for every chat. Rename, recolour or delete it in the Injection Blocks panel.</small>' : '',
+        variable ? `<small class="cr-hint">State Engine variable <code>${escapeHtml(nameFromKey(block.id))}</code> from <b>${escapeHtml(block.provenance?.extensionId ?? '')}</b>. ${block.provenance?.hasValue ? 'Its value in this chat - read-only here; it changes as the story goes.' : 'No value in this chat (its preset may not be active here), so nothing is sent.'}</small>` : '',
     ].join('');
     return `${renderNotes(block)}
         <textarea class="text_pole cr-text" rows="${Math.min(16, Math.max(3, block.text.split('\n').length + 1))}" ${editable ? '' : 'readonly'}>${escapeHtml(block.text)}</textarea>
@@ -363,6 +413,7 @@ function renderAll() {
     renderSummary();
     renderList();
     renderLibrary();
+    renderVariableBank();
     renderLore();
     root.querySelector('.cr-compiled').hidden = true;
 }
@@ -430,6 +481,46 @@ function renderLibrary() {
         reorderInjections(ids);
         await afterLibraryChange({ keepLibrary: true });
     });
+}
+
+// The State Engine variable bank: every variable other State Engine
+// extensions offer for injection, grouped by extension. Hidden entirely
+// without State Engine.
+function renderVariableBank() {
+    const bank = root.querySelector('.cr-vars');
+    bank.hidden = !isStateEngineConnected();
+    if (bank.hidden) return;
+    const list = bank.querySelector('.cr-var-list');
+    if (!injectables.length) {
+        list.innerHTML = '<small class="cr-hint">No State Engine extension offers injectable variables yet.</small>';
+        return;
+    }
+    const byExtension = new Map();
+    for (const variable of injectables) {
+        if (!byExtension.has(variable.extensionId)) byExtension.set(variable.extensionId, []);
+        byExtension.get(variable.extensionId).push(variable);
+    }
+    const hasChat = Boolean(SillyTavern.getContext().chatId);
+    list.innerHTML = [...byExtension.entries()].map(([extensionId, variables]) => `
+        <div class="cr-var-group">
+            <div class="cr-var-ext" title="${escapeHtml(variables[0].extensionDescription || extensionId)}"><i class="fa-solid fa-puzzle-piece"></i> ${escapeHtml(extensionId)}</div>
+            <ul>${variables.map(v => {
+        const setting = getVariableSetting(v.name);
+        const value = variableValues[v.name] ?? { text: '', hasValue: false };
+        const preview = !hasChat ? 'open a chat to see its value'
+            : !value.hasValue ? 'no value in this chat'
+                : value.text.trim() ? value.text.replace(/\s+/g, ' ').slice(0, 90) + (value.text.length > 90 ? '...' : '') : '(empty)';
+        return `
+                <li class="cr-var-item${setting.enabled ? '' : ' cr-off'}" data-name="${escapeHtml(v.name)}" title="${escapeHtml(v.description || v.name)}">
+                    <div class="cr-var-head">
+                        <input type="checkbox" class="cr-var-enabled" ${setting.enabled ? 'checked' : ''} title="Inject into every Chat Completion prompt where it has a value" />
+                        <span class="cr-var-name">${escapeHtml(v.label)}${v.defined ? '' : ' <small>(not defined yet)</small>'}</span>
+                        <select class="text_pole cr-var-role" title="Message role">${ROLES.map(r => `<option value="${r}"${setting.role === r ? ' selected' : ''}>${r}</option>`).join('')}</select>
+                    </div>
+                    <small class="cr-var-preview${value.hasValue && value.text.trim() ? '' : ' cr-hint'}">${escapeHtml(preview)}</small>
+                </li>`;
+    }).join('')}</ul>
+        </div>`).join('');
 }
 
 // After any change to the library: rebuild the injection sections and
@@ -730,6 +821,16 @@ function wireEvents() {
             return;
         }
 
+        const variableItem = e.target.closest('.cr-var-item');
+        if (variableItem && e.target.closest('.cr-var-name')) {
+            const row = rowFor(variableKey(variableItem.dataset.name));
+            if (row) {
+                if (row.querySelector(':scope > .cr-block-body').hidden) toggleExpand(row);
+                row.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+            }
+            return;
+        }
+
         const presetRow = e.target.closest('[data-preset-id]');
         if (presetRow && e.target.closest('.cr-mypreset-delete')) {
             deleteUserPreset(presetRow.dataset.presetId);
@@ -748,6 +849,9 @@ function wireEvents() {
             if (isInjectionKey(li.dataset.id)) {
                 updateInjection(idFromKey(li.dataset.id), { enabled: target.checked });
                 renderLibrary();
+            } else if (isVariableKey(li.dataset.id)) {
+                updateVariableSetting(nameFromKey(li.dataset.id), { enabled: target.checked });
+                renderVariableBank();
             }
             onToggleBlock(li.dataset.id, target.checked);
             refreshMeters();
@@ -779,6 +883,16 @@ function wireEvents() {
             else if (target.classList.contains('cr-lib-role')) updateInjection(id, { role: target.value });
             else if (target.classList.contains('cr-lib-text')) updateInjection(id, { text: target.value });
             await afterLibraryChange();
+            return;
+        }
+
+        const variableItem = target.closest('.cr-var-item');
+        if (variableItem) {
+            const name = variableItem.dataset.name;
+            if (target.classList.contains('cr-var-enabled')) updateVariableSetting(name, { enabled: target.checked });
+            else if (target.classList.contains('cr-var-role')) updateVariableSetting(name, { role: target.value });
+            await afterLibraryChange({ keepLibrary: true });
+            renderVariableBank();
             return;
         }
 
@@ -849,6 +963,7 @@ async function rebuildFromCapture(onlyBlockId = null) {
         return;
     }
     setSnapshot(fresh);
+    await loadVariableBank();
     await arrangeSnapshot(fresh);
     renderAll();
 }
@@ -868,6 +983,9 @@ async function runAction(action) {
             await rebuildFromCapture();
             break;
         }
+        case 'test-prompt':
+            await testPrompt();
+            break;
         case 'compile': {
             const text = await onRecompile();
             const panel = root.querySelector('.cr-compiled');
@@ -916,6 +1034,52 @@ async function runAction(action) {
 }
 
 // -----------------------------------------------------------------
+// Prompt Tester
+// -----------------------------------------------------------------
+
+// The prompt as compiled here, with injection blocks' macros resolved the
+// way they are when sent. Works on a copy - the snapshot is not changed.
+async function compileForTest(snapshot = getSnapshot()) {
+    const copy = PromptSnapshot.fromJSON(JSON.parse(JSON.stringify(snapshot.toJSON())));
+    for (const block of copy.blocks) {
+        if (!isInjectionKey(block.id)) continue;
+        const injection = getInjection(idFromKey(block.id));
+        if (injection) block.text = resolvedText(injection);
+    }
+    const text = compiler.compile(copy);
+    return { text, tokens: compiler.countTokens(copy) };
+}
+
+async function testPrompt(snapshot = getSnapshot()) {
+    const { text, tokens } = await compileForTest(snapshot);
+    if (!text.trim()) {
+        toastr.warning('The compiled prompt is empty - nothing to test.', 'Curator');
+        return;
+    }
+    await openTesterModal(text, { meta: `${fmt(tokens)} tokens · ${fmt(text.length)} characters` });
+}
+
+/**
+ * Test Prompt from outside the analyzer (Curator's drawer): analyses the
+ * last prompt - building one with a dry run if needed - arranges it exactly
+ * as the analyzer would (saved arrangement, injection blocks, State Engine
+ * variables), compiles it and opens the Prompt Tester.
+ */
+export async function testCurrentPrompt() {
+    const capture = getLastPrompt() ?? await refreshPrompt();
+    if (!capture) {
+        toastr.info('No prompt available yet - open a chat first.', 'Curator');
+        return;
+    }
+    const snapshot = await analyzePrompt(capture);
+    setSnapshot(snapshot);
+    live = true;
+    await loadVariableBank();
+    if (snapshot.meta.kind === 'cc') await arrangeSnapshot(snapshot);
+    await testPrompt(snapshot);
+}
+
+// -----------------------------------------------------------------
 // Open
 // -----------------------------------------------------------------
 
@@ -928,6 +1092,7 @@ function buildRoot() {
             <div class="cr-toolbar">
                 <div class="menu_button menu_button_icon" data-action="refresh" title="Rebuild the prompt for the current chat now (dry run - nothing is sent)"><i class="fa-solid fa-rotate"></i><span>Refresh</span></div>
                 <div class="menu_button menu_button_icon" data-action="compile" title="Show the prompt as arranged here"><i class="fa-solid fa-gears"></i><span>Compile</span></div>
+                <div class="menu_button menu_button_icon" data-action="test-prompt" title="Compile the prompt as arranged here and run it against a model - a sandbox call, nothing reaches the chat"><i class="fa-solid fa-flask"></i><span>Test Prompt</span></div>
                 <div class="menu_button menu_button_icon" data-action="save-snapshot" title="Save this analysis"><i class="fa-solid fa-camera"></i><span>Snapshot</span></div>
                 <div class="menu_button fa-solid fa-angles-down" data-action="expand-all" title="Expand all"></div>
                 <div class="menu_button fa-solid fa-angles-up" data-action="collapse-all" title="Collapse all"></div>
@@ -966,6 +1131,11 @@ function buildRoot() {
                     <details class="cr-mypresets" hidden><summary></summary><ul></ul></details>
                     <ol class="cr-lib-list"></ol>
                 </div>
+                <div class="cr-vars" hidden>
+                    <div class="cr-side-head"><b><i class="fa-solid fa-gears"></i> State Engine Variables</b></div>
+                    <small class="cr-hint">Offered by State Engine extensions. Their content is each chat's current value - read-only, it changes as the story goes. Tick one to inject it; drag its section in the prompt to place it.</small>
+                    <div class="cr-var-list"></div>
+                </div>
                 <div class="cr-side-head"><b><i class="fa-solid fa-book-atlas"></i> Connected Lorebooks</b></div>
                 <div class="cr-lore"></div>
             </aside>
@@ -986,6 +1156,7 @@ export async function openAnalyzerModal({ live: isLive = true } = {}) {
     expanded.clear();
     editingInjection = null;
     Object.assign(find, { query: '', matches: [], index: -1, revealed: false });
+    await loadVariableBank();
     if (injectionsSupported()) await arrangeSnapshot(snapshot);
 
     root = buildRoot();

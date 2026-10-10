@@ -57,9 +57,38 @@ Injection blocks are always sent while enabled. They don't need **Curator contro
 - Each block is sent as one message, in the role you choose (system by default).
 - Blocks imported from presets or other extensions are **copies**. Editing them never changes the original source.
 
+## State Engine variables (second bank)
+
+When [State Engine](https://github.com/StygianTechnica/SillyTavern-StateEngine) is installed, the analyzer shows a second bank, **State Engine Variables**. It lists variables that other State Engine extensions (Memory Manager, Scenario Builder...) offer for injection, grouped by the extension that offers them. Without State Engine this bank doesn't exist.
+
+- **Content is the variable's value in the current chat.** It's dynamic and chat-specific, so it can't be edited in Curator. Open its section to read the current value.
+- **Tick one to inject it.** It's sent as one message wherever you drag its section, in the role you pick. The choice applies to every chat.
+- **Nothing is sent where there's no value.** That happens when the variable's preset isn't active in that chat. The section then shows **no value**.
+- **The list doesn't need a chat.** Offered variables are known as soon as their extension has declared them. Values appear once a chat is open.
+- Variables are switched **off** until you tick them.
+
+To get any other State Engine variable into the prompt, put its `{{macro}}` in a constant World Info entry.
+
 ## For extension developers
 
-Other extensions (Scenario Builder, a memory extension...) can offer blocks that users import from **Add from...**:
+### Offering State Engine variables (requires State Engine)
+
+Declare one State Engine **capability** per injectable variable: `curator.inject:<fully-qualified variable name>`. The variable must be in your own namespace.
+
+```js
+stateEngine.registerExtension(EXTENSION_ID, instanceId, {
+    namespace: 'mm',
+    variables: ['mm__summary', 'mm__recent_events'],
+    capabilities: ['curator.inject:mm__summary', 'curator.inject:mm__recent_events'],
+    description: 'Memory Manager',
+});
+```
+
+Curator reads State Engine's capability graph, so this works whatever order extensions load in and with no chat open. Labels and descriptions come from the variable definitions, and values come from the Variable Value API for the open chat. The value is sent exactly as State Engine's own `{{macro}}` renders it, so write prompt-ready text into the variable. Nothing else is needed: no Curator API call, and Curator need not be installed.
+
+### Offering static injection blocks (no State Engine needed)
+
+Other extensions can also offer ready-made, editable blocks that users import from **Add a block...**:
 
 ```js
 function register() {
