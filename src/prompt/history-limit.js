@@ -17,15 +17,20 @@ export function normalizeLimit(value) {
     return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
-// For each prompt text, whether it is (mostly) one of the chat's messages.
-// A prompt message usually holds the chat message plus a "Name: " prefix,
-// so it counts as a chat message when a chat message covers at least half
-// of it.
-export function chatMessageFlags(texts, chat) {
+// For each Chat History entry ({ text, role }), whether it is a chat
+// message (counted by the limit) rather than an in-chat injection (always
+// kept). User and assistant entries are chat messages. System entries are
+// where injections live (Author's Note, lorebook @depth entries, extension
+// prompts) - one counts only if its text is clearly one of the chat's own
+// messages (e.g. a narrator message). Matching by role first matters:
+// SillyTavern often changes message text on its way into the prompt
+// (regex scripts, macros, formatting), so text alone can't be relied on.
+export function chatMessageFlags(entries, chat) {
     const messages = (chat ?? [])
         .map(m => normalize(m?.mes))
         .filter(m => m.length > 0);
-    return texts.map(text => {
+    return entries.map(({ text, role }) => {
+        if (role === 'user' || role === 'assistant') return true;
         const norm = normalize(text);
         if (!norm) return false;
         return messages.some(m => m.length >= norm.length * 0.5 && norm.includes(m));

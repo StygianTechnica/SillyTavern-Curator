@@ -86,7 +86,7 @@ async function onChatCompletionPrompt(data) {
     if (reorder || injections.length || historyLimit !== null) {
         const flags = historyLimit === null ? null : (() => {
             const inHistory = leaves.map(l => sectionKey(l) === 'chatHistory');
-            const isChat = chatMessageFlags(leaves.map((l, i) => (inHistory[i] ? l.content : '')), SillyTavern.getContext().chat);
+            const isChat = chatMessageFlags(leaves.map((l, i) => (inHistory[i] ? { text: l.content, role: l.role } : { text: '', role: null })), SillyTavern.getContext().chat);
             return isChat.map((flag, i) => inHistory[i] && flag);
         })();
         buildOutgoing(data.chat, leaves, { layout: settings.layout, reorder, injections, historyLimit, chatFlags: flags });

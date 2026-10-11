@@ -146,7 +146,7 @@ function applyHistoryLimit(snapshot = getSnapshot()) {
     if (!group?.children?.length) return;
     const limit = injectionsSupported() ? normalizeLimit(getSettings().historyLimit) : null;
     const children = [...group.children].sort((a, b) => a.order - b.order);
-    const isChat = chatMessageFlags(children.map(c => c.text), SillyTavern.getContext().chat);
+    const isChat = chatMessageFlags(children.map(c => ({ text: c.text, role: c.role })), SillyTavern.getContext().chat);
     const keep = historyKeepMask(isChat, limit);
     children.forEach((child, i) => {
         if (!keep[i]) {
@@ -275,22 +275,31 @@ function renderRow(block, { child = false } = {}) {
                 ${variable ? `<span class="cr-badge cr-source" title="Offered by this State Engine extension">${escapeHtml(block.provenance?.extensionId ?? '')}</span>` : ''}
                 ${variable && !block.provenance?.hasValue ? '<span class="cr-badge" title="This chat holds no value for it, so nothing is sent">no value</span>' : ''}
                 ${child && block.limited ? '<span class="cr-badge" title="Dropped by the chat history limit">beyond limit</span>' : ''}
-                ${block.id === 'chatHistory' && injectionsSupported() ? renderHistoryLimit(block) : ''}
                 ${block.role && !child ? `<span class="cr-role">${escapeHtml(block.role)}</span>` : ''}
                 <span class="cr-tokens" title="${pct.toFixed(1)}% of context">${fmt(tokens)} tok</span>
                 <span class="cr-meter" title="${pct.toFixed(1)}% of context"><span style="width:${Math.min(100, pct * 2).toFixed(1)}%"></span></span>
                 <span class="cr-expand fa-solid ${isOpen ? 'fa-chevron-up' : 'fa-chevron-down'}" title="Show contents"></span>
             </div>
+            ${block.id === 'chatHistory' && !child && injectionsSupported() ? renderHistoryLimit(block) : ''}
             <div class="cr-block-body"${isOpen ? '' : ' hidden'}>${isOpen ? renderBody(block) : ''}</div>
         </li>`;
 }
 
+// The limit bar on the Chat History delineator - always visible, no need
+// to open the section.
 function renderHistoryLimit(block) {
     const limit = normalizeLimit(getSettings().historyLimit);
     const stats = block.historyStats;
-    const summary = stats && limit !== null ? `<small class="cr-history-stats">${stats.kept} of ${stats.total}</small>` : '';
-    return `<label class="cr-history-limit" title="Keep only the most recent chat messages in every prompt (blank = all). In-chat injections inside the history are always kept. Saved - applies to every chat.">
-        <span>last</span><input type="number" class="text_pole cr-history-limit-input" min="0" step="1" value="${limit ?? ''}" placeholder="all" /><span>msgs</span>${summary}</label>`;
+    const summary = !stats ? ''
+        : limit === null ? `all ${stats.total} chat messages sent`
+            : stats.kept < stats.total ? `sending the last ${stats.kept} of ${stats.total} - ${stats.total - stats.kept} older trimmed`
+                : `all ${stats.total} fit within the limit`;
+    return `
+        <div class="cr-history-bar" title="Applies to every prompt in every chat, saved at once. In-chat injections inside the history (Author's Note, lorebook entries...) are always kept.">
+            <i class="fa-solid fa-scissors"></i>
+            <label>Keep the last <input type="number" class="text_pole cr-history-limit-input" min="0" step="1" value="${limit ?? ''}" placeholder="all" /> chat messages</label>
+            <small class="cr-history-stats">${escapeHtml(summary)}</small>
+        </div>`;
 }
 
 function renderNotes(block) {
@@ -940,7 +949,7 @@ function wireEvents() {
             renderList();
             refreshMeters();
             const limit = getSettings().historyLimit;
-            toastr.info(limit === null ? 'Chat history limit removed - all messages SillyTavern includes are sent.' : `Only the last ${limit} chat messages are sent from now on.`, 'Curator');
+            toastr.info(limit === null ? 'Chat history limit removed - all messages SillyTavern includes are sent.' : `Only the last ${limit} chat messages are sent from now on, in every chat.`, 'Curator');
             return;
         }
 
