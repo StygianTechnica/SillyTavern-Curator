@@ -3,7 +3,7 @@
 // dragged into a new order, switched off, and (for single sections)
 // edited. For a live Chat Completion prompt:
 //   - SillyTavern's own sections: the arrangement can be saved and applied
-//     to every generation ("Curator controls prompt order").
+//     to every chat reply ("Curator controls the prompt").
 //   - Curator's global injection blocks appear as ordinary sections and are
 //     managed from the Injection Blocks panel; dragging one saves its place
 //     at once.
@@ -211,7 +211,9 @@ async function syncInjectionBlocks(snapshot = getSnapshot()) {
         block.anchor = injection.anchor;
         injected.push(block);
     }
-    for (const variable of injectables) {
+    // Only the variables the user put in the prompt; the others wait in the
+    // bank (the side panel), so the list isn't crowded with what is offered.
+    for (const variable of injectables.filter(v => getVariableSetting(v.name).enabled)) {
         const block = await variableBlock(variable);
         block.anchor = getVariableSetting(variable.name).anchor;
         injected.push(block);
@@ -251,6 +253,14 @@ function isDirty() {
 // Rendering - section list
 // -----------------------------------------------------------------
 
+// An extension id as a short name: "SillyTavern-StateEngine-Archivist" ->
+// "Archivist", State Engine's built-in "se" -> "State Engine".
+export function shortExtensionName(id) {
+    const text = String(id ?? '');
+    if (text === 'se') return 'State Engine';
+    return text.replace(/^SillyTavern-/i, '').replace(/^StateEngine-/i, '') || text;
+}
+
 function colorStyle(block) {
     return block.color ? ` style="--cr-cat:${escapeHtml(block.color)}"` : '';
 }
@@ -268,11 +278,13 @@ function renderRow(block, { child = false } = {}) {
         <li class="cr-block cr-cat-${escapeHtml(block.category)}${block.enabled ? '' : ' cr-off'}${child ? ' cr-child' : ''}${injection || variable ? ' cr-injection' : ''}" data-id="${escapeHtml(block.id)}"${colorStyle(block)}>
             <div class="cr-block-head">
                 <span class="cr-drag fa-solid fa-grip-vertical" title="Drag to reorder"></span>
-                <input type="checkbox" class="cr-toggle" ${block.enabled ? 'checked' : ''} title="${toggleTitle}" />
+                ${variable && !child
+        ? '<button type="button" class="cr-var-remove fa-solid fa-trash-can" title="Remove from the prompt (it stays offered in the State Engine Variables panel)"></button>'
+        : `<input type="checkbox" class="cr-toggle" ${block.enabled ? 'checked' : ''} title="${toggleTitle}" />`}
                 <span class="cr-chip">${escapeHtml(CATEGORIES[block.category] ?? block.category)}</span>
                 <span class="cr-label" title="${escapeHtml(block.label)}">${escapeHtml(block.label)}</span>
                 ${block.edited ? '<span class="cr-badge" title="Text edited">edited</span>' : ''}
-                ${variable ? `<span class="cr-badge cr-source" title="Offered by this State Engine extension">${escapeHtml(block.provenance?.extensionId ?? '')}</span>` : ''}
+                ${variable ? `<span class="cr-badge cr-source" title="Offered by ${escapeHtml(block.provenance?.extensionId ?? '')}">${escapeHtml(shortExtensionName(block.provenance?.extensionId))}</span>` : ''}
                 ${variable && !block.provenance?.hasValue ? '<span class="cr-badge" title="This chat holds no value for it, so nothing is sent">no value</span>' : ''}
                 ${child && block.limited ? '<span class="cr-badge" title="Dropped by the chat history limit">beyond limit</span>' : ''}
                 ${block.role && !child ? `<span class="cr-role">${escapeHtml(block.role)}</span>` : ''}
@@ -551,7 +563,7 @@ function renderVariableBank() {
     const hasChat = Boolean(SillyTavern.getContext().chatId);
     list.innerHTML = [...byExtension.entries()].map(([extensionId, variables]) => `
         <div class="cr-var-group">
-            <div class="cr-var-ext" title="${escapeHtml(variables[0].extensionDescription || extensionId)}"><i class="fa-solid fa-puzzle-piece"></i> ${escapeHtml(extensionId)}</div>
+            <div class="cr-var-ext" title="${escapeHtml(variables[0].extensionDescription || extensionId)}"><i class="fa-solid fa-puzzle-piece"></i> ${escapeHtml(shortExtensionName(extensionId))}</div>
             <ul>${variables.map(v => {
         const setting = getVariableSetting(v.name);
         const value = variableValues[v.name] ?? { text: '', hasValue: false };
@@ -877,6 +889,15 @@ function wireEvents() {
             return;
         }
 
+        const removeVariable = e.target.closest('.cr-var-remove');
+        if (removeVariable) {
+            const li = removeVariable.closest('.cr-block');
+            updateVariableSetting(nameFromKey(li.dataset.id), { enabled: false });
+            await afterLibraryChange({ keepLibrary: true });
+            renderVariableBank();
+            return;
+        }
+
         const variableItem = e.target.closest('.cr-var-item');
         if (variableItem && e.target.closest('.cr-var-name')) {
             const row = rowFor(variableKey(variableItem.dataset.name));
@@ -975,9 +996,9 @@ function wireEvents() {
             settings.applyLayout = target.checked;
             if (settings.applyLayout && !settings.layout) settings.layout = layoutFromSnapshot();
             saveSettings();
-            const drawerBox = document.getElementById('cr_apply_layout');
-            if (drawerBox) drawerBox.checked = settings.applyLayout;
-            toastr.info(settings.applyLayout ? 'Curator now controls the prompt order.' : 'SillyTavern\'s own prompt order restored.', 'Curator');
+            // The drawer's copy of the switch (and its dependent options) follows.
+            document.getElementById('cr_apply_layout')?.dispatchEvent(new Event('cr:sync'));
+            toastr.info(settings.applyLayout ? 'Curator now controls the prompt: arrangement, injection blocks, variables and history limit.' : 'Curator no longer changes prompts - SillyTavern\'s own prompt is sent.', 'Curator');
             renderHeader();
         }
     });
@@ -1088,7 +1109,7 @@ async function runAction(action) {
         case 'save-layout':
             settings.layout = layoutFromSnapshot();
             saveSettings();
-            toastr.success(settings.applyLayout ? 'Arrangement saved - used from the next generation.' : 'Arrangement saved. Turn on "Curator controls prompt order" to use it.', 'Curator');
+            toastr.success(settings.applyLayout ? 'Arrangement saved - used from the next generation.' : 'Arrangement saved. Turn on "Curator controls the prompt" to use it.', 'Curator');
             renderHeader();
             break;
         case 'reset-layout':
@@ -1214,8 +1235,8 @@ function buildRoot() {
                 </div>
             </div>
             <div class="cr-apply" hidden>
-                <label class="checkbox_label" title="Rearrange SillyTavern's own sections in every Chat Completion prompt by the saved arrangement before it is sent. Overrides the prompt manager's order. (Injection blocks are always placed where you put them.)">
-                    <input type="checkbox" class="cr-apply-toggle" /><span>Curator controls prompt order</span>
+                <label class="checkbox_label" title="Let Curator change each chat reply's Chat Completion prompt before it is sent: the saved arrangement (overriding the prompt manager's order), injection blocks, the State Engine variables you added and the history limit. Off: nothing is changed.">
+                    <input type="checkbox" class="cr-apply-toggle" /><span>Curator controls the prompt</span>
                 </label>
                 <div class="menu_button menu_button_icon" data-action="save-layout"><i class="fa-solid fa-floppy-disk"></i><span>Save Arrangement</span></div>
                 <div class="menu_button menu_button_icon" data-action="reset-layout" title="Forget the saved arrangement"><i class="fa-solid fa-arrow-rotate-left"></i><span>Reset</span></div>
@@ -1284,6 +1305,8 @@ export async function openAnalyzerModal({ live: isLive = true } = {}) {
         allowVerticalScrolling: true,
         leftAlign: true,
     });
+    // Wider than SillyTavern's chat column: the analyzer needs the room.
+    popup.dlg?.classList.add('cr-analyzer-popup');
     await popup.show();
     root = null;
 }

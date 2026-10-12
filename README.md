@@ -15,8 +15,12 @@ Drag sections (grip handle) to reorder, untick to drop, expand to read or edit. 
 ## Injection Blocks
 Global blocks of your own text, sent with every Chat Completion prompt in every chat, wherever you drag them. Create, edit, colour, enable, clone, reorder and delete them in the analyzer's Injection Blocks panel; add ready-made ones from presets or other extensions; or clone any prompt section into one to experiment. **Keep them setting-agnostic** - setting-specific content belongs in the character, persona, scenario or lorebooks. See [docs/injection-blocks.md](docs/injection-blocks.md).
 
-## Curator controls prompt order (Chat Completion)
-**Save Arrangement** stores the order, on/off state and edited text of each section. With **Curator controls prompt order** on, every Chat Completion prompt is rearranged that way just before it is sent - overriding the prompt manager. Sections Curator hasn't seen before keep their place after their neighbour. Raw generations from other extensions (trackers etc.) are never touched. Edited text replaces that section on *every* generation, so prefer editing static sections (Main Prompt, custom prompts).
+## Curator controls the prompt (Chat Completion)
+Curator changes nothing until you switch on **Curator controls the prompt** in its drawer. With it on, just before each Chat Completion prompt is sent Curator applies your saved arrangement, your injection blocks, the State Engine variables you added and the chat history limit; with it off, Curator only captures prompts for the analyzer. Disabled, Curator does nothing at all.
+
+**Only change chat replies** (on by default): other extensions can build prompts through SillyTavern's prompt manager too - summaries, background ("quiet") generations - and those would otherwise get your arrangement and injections. With it on, Curator leaves them alone and only changes the prompts for the chat's own replies (normal, swipe, regenerate, continue, impersonate). If another extension misbehaves while Curator controls the prompt, check this first.
+
+**Save Arrangement** stores the order, on/off state and edited text of each section; while Curator controls the prompt, it is applied to every chat reply's prompt - overriding the prompt manager. Sections Curator hasn't seen before keep their place after their neighbour. Raw generations from other extensions (trackers etc.) are never touched. Edited text replaces that section on *every* generation, so prefer editing static sections (Main Prompt, custom prompts).
 
 ## Prompt Tester
 **Test Prompt** (analyzer toolbar or drawer) runs the compiled prompt against SillyTavern's active connection or any of its Connection Profiles (like State Engine), in a sandbox: nothing reaches the chat and no other extension sees the call. Switch profiles and run again to compare responses side by side. Nothing is sent until you press **Run**. See [docs/prompt-tester.md](docs/prompt-tester.md).

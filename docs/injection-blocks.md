@@ -55,7 +55,7 @@ It's meant for State Engine's **prompted** scene variables. Those are filled by 
 
 Each block remembers the section directly above it. If that section isn't in a particular prompt (an empty Author's Note, say), the block falls back to just before Chat History. Blocks you've never dragged sit just before Chat History too.
 
-Injection blocks are always sent while enabled. They don't need **Curator controls prompt order**; that switch only rearranges SillyTavern's *own* sections.
+Enabled injection blocks are sent only while **Curator controls the prompt** is on (Curator's drawer) - with it off, Curator changes no prompt at all - and, with **Only change chat replies** on, only in the prompts for the chat's own replies, never in other extensions' background prompts.
 
 ### Limits
 
@@ -68,10 +68,12 @@ Injection blocks are always sent while enabled. They don't need **Curator contro
 When [State Engine](https://github.com/StygianTechnica/SillyTavern-StateEngine) is installed, the analyzer shows a second bank, **State Engine Variables**. It lists variables that other State Engine extensions (Memory Manager, Scenario Builder...) offer for injection, grouped by the extension that offers them. Without State Engine this bank doesn't exist.
 
 - **Content is the variable's value in the current chat.** It's dynamic and chat-specific, so it can't be edited in Curator. Open its section to read the current value.
-- **Tick one to inject it.** It's sent as one message wherever you drag its section, in the role you pick. The choice applies to every chat.
+- **Tick one to add it to the prompt.** Its section appears in the prompt list; drag it where it belongs. It's sent as one message there, in the role you pick, while Curator controls the prompt. The choice applies to every chat.
+- **Remove it with the bin** on its section in the prompt list (or untick it in the bank). It leaves the prompt list and stays offered in the bank - unticked variables never crowd the prompt list.
 - **Nothing is sent where there's no value.** That happens when the variable's preset isn't active in that chat. The section then shows **no value**.
 - **The list doesn't need a chat.** Offered variables are known as soon as their extension has declared them. Values appear once a chat is open.
-- Variables are switched **off** until you tick them.
+- Variables are **not in the prompt** until you tick them.
+- The bank and the prompt list name the offering extension briefly ("Archivist", "State Engine"); hover for its full id. Offered text should not name its source - the model doesn't need it.
 
 To get any other State Engine variable into the prompt, put its `{{macro}}` in a constant World Info entry.
 

@@ -11,10 +11,15 @@
                     <input id="cr_enabled" type="checkbox" />
                     <span>Enable Curator</span>
                 </label>
-                <label class="checkbox_label" title="Rearrange every Chat Completion prompt by the arrangement saved in the Prompt Analyzer. Overrides the prompt manager's order.">
+                <label class="checkbox_label" title="Let Curator change Chat Completion prompts before they are sent: the arrangement saved in the Prompt Analyzer (overriding the prompt manager's order), your injection blocks, the State Engine variables you ticked, and the chat history limit. Off: Curator only captures prompts for the analyzer.">
                     <input id="cr_apply_layout" type="checkbox" />
-                    <span>Curator controls prompt order</span>
+                    <span>Curator controls the prompt</span>
                 </label>
+                <label class="checkbox_label" title="Other extensions can build prompts through SillyTavern's prompt manager too (summaries, background 'quiet' generations). With this on, Curator leaves those alone and only changes the prompts for the chat's own replies.">
+                    <input id="cr_only_chat" type="checkbox" />
+                    <span>Only change chat replies</span>
+                </label>
+                <small id="cr_control_warning" class="cr-hint cr-warning" hidden>While Curator controls the prompt, it changes every Chat Completion prompt SillyTavern builds with its prompt manager - including ones other extensions send for their own purposes, unless <b>Only change chat replies</b> is on. If another extension misbehaves, try that first, or switch control off.</small>
             </div>
             <small id="cr_status" class="cr-hint"></small>
 

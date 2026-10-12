@@ -31,7 +31,9 @@ function renderCaptureInfo(prompt) {
         info.textContent = 'No prompt captured yet - opening the analyzer will build one for the current chat.';
     } else {
         const kind = prompt.kind === 'cc' ? `Chat Completion, ${prompt.leaves.length} messages` : `Text Completion, ${prompt.text.length} characters`;
-        const applied = prompt.applied ? ' - rearranged by Curator' : '';
+        const applied = prompt.untouched === 'off' ? ' - not changed (Curator does not control the prompt)'
+            : prompt.untouched === 'background' ? ' - another extension\'s prompt, left alone'
+                : prompt.applied ? ' - rearranged by Curator' : '';
         info.textContent = `Last prompt: ${kind}${applied}, captured ${new Date(prompt.capturedAt).toLocaleTimeString()}.`;
     }
 }
@@ -64,22 +66,38 @@ export async function addSettingsDrawer(stateEngineStatus) {
         getSettings().enabled = enabledBox.checked;
         saveSettings();
         renderCaptureInfo(getLastPrompt());
+        document.getElementById('cr_apply_layout')?.dispatchEvent(new Event('cr:sync'));
     });
 
     setStateEngineStatus(stateEngineStatus);
 
+    // "Curator controls the prompt": every change Curator makes to a prompt
+    // (order, injections, variables, history limit) - see src/capture.js.
     const applyBox = document.getElementById('cr_apply_layout');
-    applyBox.checked = getSettings().applyLayout;
+    const onlyChat = document.getElementById('cr_only_chat');
+    const warning = document.getElementById('cr_control_warning');
+    const syncControl = () => {
+        const settings = getSettings();
+        applyBox.checked = settings.applyLayout;
+        applyBox.disabled = !settings.enabled;
+        onlyChat.checked = settings.onlyChatReplies !== false;
+        onlyChat.disabled = !settings.enabled || !settings.applyLayout;
+        warning.hidden = !(settings.enabled && settings.applyLayout);
+    };
     applyBox.addEventListener('change', () => {
         const settings = getSettings();
-        if (applyBox.checked && !settings.layout) {
-            applyBox.checked = false;
-            toastr.info('Open the Prompt Analyzer and save an arrangement first.', 'Curator');
-            return;
-        }
         settings.applyLayout = applyBox.checked;
         saveSettings();
+        if (applyBox.checked && !settings.layout) {
+            toastr.info('Curator now adds your injection blocks and variables. To rearrange SillyTavern\'s own sections too, save an arrangement in the Prompt Analyzer.', 'Curator');
+        }
+        syncControl();
     });
+    onlyChat.addEventListener('change', () => {
+        getSettings().onlyChatReplies = onlyChat.checked;
+        saveSettings();
+    });
+    syncControl();
 
     document.getElementById('cr_analyze').addEventListener('click', () => onAnalyzePrompt());
     document.getElementById('cr_test_prompt').addEventListener('click', () => testCurrentPrompt());
@@ -104,9 +122,10 @@ export async function addSettingsDrawer(stateEngineStatus) {
     });
 
     renderCaptureInfo(getLastPrompt());
+    applyBox.addEventListener('cr:sync', syncControl);
     onPromptCaptured((prompt) => {
         renderCaptureInfo(prompt);
-        applyBox.checked = getSettings().applyLayout;
+        syncControl();
     });
     await refreshSnapshotList();
 }

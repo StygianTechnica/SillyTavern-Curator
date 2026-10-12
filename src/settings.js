@@ -9,6 +9,9 @@ const DEFAULTS = {
     // When true, every Chat Completion prompt is rearranged by `layout`
     // before it is sent (src/capture.js, src/prompt/sections.js).
     applyLayout: false,
+    // Leave alone prompts other extensions build through the prompt manager
+    // ('quiet' generations): only the chat's own replies are changed.
+    onlyChatReplies: true,
     // { sections: [{ key, enabled, text? }] } - saved from the analyzer modal.
     layout: null,
     // Keep only the last N chat messages in Chat History (null = all),

@@ -235,8 +235,9 @@
 }
 
 .cr-modal .cr-label {
-    flex: 1;
-    min-width: 0;
+    /* The label keeps room before badges and the meter give way. */
+    flex: 1 1 10em;
+    min-width: 6em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -250,6 +251,27 @@
     border: 1px solid var(--SmartThemeBorderColor);
     border-radius: 6px;
     padding: 0 4px;
+    max-width: 10em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 0 1 auto;
+}
+
+/* A variable in the prompt: removed, not switched off. */
+.cr-modal .cr-var-remove {
+    margin: 0;
+    padding: 2px 4px;
+    border: none;
+    background: none;
+    color: inherit;
+    opacity: 0.6;
+    cursor: pointer;
+}
+
+.cr-modal .cr-var-remove:hover {
+    opacity: 1;
+    color: #e05555;
 }
 
 .cr-modal .cr-tokens {
@@ -877,4 +899,16 @@
 
 .cr-modal .cr-history-stats {
     opacity: 0.75;
+}
+
+/* The analyzer gets most of the window, not just the chat column's width. */
+.popup.cr-analyzer-popup {
+    width: min(96vw, 1800px) !important;
+    max-width: 96vw !important;
+    min-width: min(96vw, 900px) !important;
+}
+
+#curator_settings .cr-warning {
+    color: var(--warning, #e0a040);
+    opacity: 0.9;
 }

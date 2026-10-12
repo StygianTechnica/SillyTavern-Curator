@@ -1,7 +1,15 @@
-// Captures the most recent prompt SillyTavern assembled, and rewrites it
-// before it is sent: Curator's enabled injection blocks are inserted, and -
-// when the user has turned on "Curator controls prompt order" -
-// SillyTavern's own sections are rearranged.
+// Captures the most recent prompt SillyTavern assembled, and - only when the
+// user has turned on "Curator controls the prompt" - rewrites it before it
+// is sent: SillyTavern's own sections rearranged (with a saved
+// arrangement), Curator's injection blocks and the State Engine variables
+// the user ticked inserted, the chat history limit applied. With that
+// switch off Curator changes nothing; disabled, it does nothing at all.
+//
+// Only chat replies (settings.onlyChatReplies, on by default): other
+// extensions can build prompts through the same prompt manager - a summary,
+// a background "quiet" generation - and those must not get the user's
+// story injections or arrangement. SillyTavern tells each generation's type
+// (GENERATION_STARTED); a 'quiet' one is captured but left as it is.
 //
 // Chat Completion: CHAT_COMPLETION_PROMPT_READY hands over the exact
 // message array about to be sent ({ chat, dryRun }); SillyTavern sends
@@ -26,6 +34,21 @@ import { sectionKey } from './prompt/sections.js';
 
 let lastPrompt = null;
 let openaiModule = null;
+// The type of the generation in progress ('normal', 'swipe', 'quiet'...),
+// from GENERATION_STARTED; null before the first.
+let generationType = null;
+
+// Generation types that are the chat itself; anything else ('quiet') is
+// another extension's background prompt.
+export const CHAT_GENERATION_TYPES = Object.freeze(['normal', 'swipe', 'regenerate', 'continue', 'impersonate']);
+
+// Whether Curator may change a prompt of generation `type` (null: unknown -
+// treated as the chat, as a dry run of the analyzer is).
+export function mayChangePrompt(settings, type) {
+    if (!settings.enabled || !settings.applyLayout) return false;
+    if (settings.onlyChatReplies === false || type === null || type === undefined) return true;
+    return CHAT_GENERATION_TYPES.includes(type);
+}
 const listeners = new Set();
 
 async function getPromptManager() {
@@ -72,10 +95,16 @@ async function onChatCompletionPrompt(data) {
         dryRun: Boolean(data.dryRun),
         chatId: SillyTavern.getContext().chatId,
         capturedAt: Date.now(),
+        generationType,
     };
 
-    // Curator's own injection blocks are always sent (when enabled);
-    // SillyTavern's sections are only reordered when the user asked for it.
+    // Nothing is changed unless Curator controls the prompt - and, by
+    // default, only for the chat's own replies.
+    if (!mayChangePrompt(settings, generationType)) {
+        lastPrompt.untouched = settings.applyLayout ? 'background' : 'off';
+        emit();
+        return;
+    }
     const injections = getInjections()
         .filter(b => b.enabled && b.text.trim())
         .map(b => ({ key: injectionKey(b.id), anchor: b.anchor, role: b.role, content: resolvedText(b) }));
@@ -112,6 +141,11 @@ function onTextCompletionPrompt(data) {
 export function initPromptCapture() {
     const { eventSource, eventTypes } = SillyTavern.getContext();
     void getPromptManager();
+    if (eventTypes.GENERATION_STARTED) {
+        eventSource.on(eventTypes.GENERATION_STARTED, (type) => {
+            generationType = typeof type === 'string' ? type : null;
+        });
+    }
     if (eventTypes.CHAT_COMPLETION_PROMPT_READY) eventSource.on(eventTypes.CHAT_COMPLETION_PROMPT_READY, onChatCompletionPrompt);
     if (eventTypes.GENERATE_AFTER_COMBINE_PROMPTS) eventSource.on(eventTypes.GENERATE_AFTER_COMBINE_PROMPTS, onTextCompletionPrompt);
 }
