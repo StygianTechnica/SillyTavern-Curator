@@ -21,7 +21,12 @@
 // chat-specific, never edited in Curator. What the user controls here is
 // whether each one is sent, where (anchor, as for injection blocks) and in
 // which role - stored in Curator's settings as
-//   variableInjections: { [qualifiedName]: { enabled, anchor, role } }
+//   variableInjections: { [qualifiedName]: { enabled, anchor, role, roleChosen } }
+//
+// SUGGESTED ROLE: an extension can say which role its variable should go in
+// by also declaring 'curator.inject.role:<role>:<qualified name>' (e.g.
+// 'curator.inject.role:user:mm__summary'). It is the variable's role until
+// the user picks one (roleChosen); without a suggestion, 'system'.
 
 import { getSettings, saveSettings } from '../settings.js';
 import { EXTENSION_ID, isStateEngineConnected } from '../api/connection.js';
@@ -30,6 +35,20 @@ import { listAllVariables, getVariableValues } from '../api/variable-values.js';
 import { ROLES } from './store.js';
 
 export const INJECT_CAPABILITY_PREFIX = 'curator.inject:';
+export const ROLE_CAPABILITY_PREFIX = 'curator.inject.role:';
+
+// qualified name -> the role its extension suggests (discoverInjectables()).
+const suggestedRoles = new Map();
+
+// 'curator.inject.role:user:mm__summary' -> ['mm__summary', 'user'], or null.
+export function parseRoleCapability(capability) {
+    if (typeof capability !== 'string' || !capability.startsWith(ROLE_CAPABILITY_PREFIX)) return null;
+    const rest = capability.slice(ROLE_CAPABILITY_PREFIX.length);
+    const at = rest.indexOf(':');
+    const role = rest.slice(0, at);
+    const name = rest.slice(at + 1).trim();
+    return at > 0 && ROLES.includes(role) && name ? [name, role] : null;
+}
 export const VARIABLE_PREFIX = 'var:';
 
 export function variableKey(name) {
@@ -51,15 +70,20 @@ function store() {
 }
 
 // The user's settings for one variable (defaults: off, before Chat History,
-// system role).
+// the extension's suggested role, else system). A role saved before the
+// user could choose one (no roleChosen) was only the default: the
+// suggestion wins over it.
 export function getVariableSetting(name) {
     const saved = store()[name] ?? {};
-    return { enabled: saved.enabled === true, anchor: saved.anchor ?? null, role: ROLES.includes(saved.role) ? saved.role : 'system' };
+    const chosen = saved.roleChosen === true && ROLES.includes(saved.role);
+    return { enabled: saved.enabled === true, anchor: saved.anchor ?? null, role: chosen ? saved.role : (suggestedRoles.get(name) ?? 'system') };
 }
 
 export function updateVariableSetting(name, changes) {
     const all = store();
-    all[name] = { ...getVariableSetting(name), ...changes };
+    const saved = all[name] ?? {};
+    const roleChosen = saved.roleChosen === true || 'role' in changes;
+    all[name] = { ...getVariableSetting(name), ...changes, roleChosen };
     saveSettings();
     return all[name];
 }
@@ -69,9 +93,9 @@ export function setVariableAnchors(anchors) {
     const all = store();
     let changed = false;
     for (const [name, anchor] of Object.entries(anchors)) {
-        const current = getVariableSetting(name);
-        if (current.anchor !== anchor) {
-            all[name] = { ...current, anchor };
+        if (getVariableSetting(name).anchor !== anchor) {
+            // Only the anchor: the rest (and whether the role was chosen) stays.
+            all[name] = { ...(all[name] ?? {}), anchor };
             changed = true;
         }
     }
@@ -105,6 +129,8 @@ export async function discoverInjectables() {
         for (const [extensionId, entry] of Object.entries(graph ?? {})) {
             const namespace = registrations?.[extensionId]?.namespace;
             for (const capability of entry?.capabilities ?? []) {
+                const suggestion = parseRoleCapability(capability);
+                if (suggestion && (!namespace || suggestion[0].startsWith(`${namespace}__`))) suggestedRoles.set(suggestion[0], suggestion[1]);
                 if (typeof capability !== 'string' || !capability.startsWith(INJECT_CAPABILITY_PREFIX)) continue;
                 const name = capability.slice(INJECT_CAPABILITY_PREFIX.length).trim();
                 if (!name) continue;

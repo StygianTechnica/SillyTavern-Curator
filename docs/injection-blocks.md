@@ -92,7 +92,9 @@ stateEngine.registerExtension(EXTENSION_ID, instanceId, {
 });
 ```
 
-Curator reads State Engine's capability graph, so this works whatever order extensions load in and with no chat open. Labels and descriptions come from the variable definitions, and values come from the Variable Value API for the open chat. The value is sent exactly as State Engine's own `{{macro}}` renders it, so write prompt-ready text into the variable. Nothing else is needed: no Curator API call, and Curator need not be installed.
+Curator reads State Engine's capability graph, so this works whatever order extensions load in and with no chat open. Labels and descriptions come from the variable definitions, and values come from the Variable Value API for the open chat. The value is sent exactly as State Engine's own `{{macro}}` renders it, so write prompt-ready text into the variable - without naming your extension in it (Curator shows the source; the model doesn't need it). Nothing else is needed: no Curator API call, and Curator need not be installed.
+
+To suggest the message role, also declare `curator.inject.role:<role>:<variable>` (`system`, `user` or `assistant`), e.g. `curator.inject.role:user:mm__summary`. It is the variable's role until the user picks one in the analyzer; without it, `system`. State Engine and Archivist suggest `user` for theirs, and start each block with the line `REFERENCE ONLY — DO NOT CONTINUE` so the model treats it as reference rather than text to continue.
 
 ### Offering static injection blocks (no State Engine needed)
 
