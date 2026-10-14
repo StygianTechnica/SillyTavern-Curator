@@ -594,6 +594,32 @@ async function afterLibraryChange({ keepLibrary = false } = {}) {
     if (!keepLibrary) renderLibrary();
 }
 
+// While the analyzer is open, the State Engine values it shows follow their
+// changes - an extension (Archivist) rewrites its variables after a reply or
+// a compile, and the analyzer would otherwise go on showing the text it
+// read when it opened. Not while the user is typing in it: then the next
+// change catches up.
+const VARIABLES_CHANGED_EVENT = 'state_engine_variables_changed';
+let valuesTimer = null;
+
+function typingInAnalyzer() {
+    const active = document.activeElement;
+    return !!active && !!root?.contains(active) && (active.tagName === 'TEXTAREA' || (active.tagName === 'INPUT' && active.type !== 'checkbox'));
+}
+
+async function refreshVariableValues() {
+    if (!root || typingInAnalyzer()) return;
+    await loadVariableBank();
+    if (!root) return;
+    renderVariableBank();
+    if (live) await afterLibraryChange({ keepLibrary: true });
+}
+
+function onVariablesChanged() {
+    clearTimeout(valuesTimer);
+    valuesTimer = setTimeout(() => void refreshVariableValues(), 400);
+}
+
 async function loadProviderOffers() {
     providerOffers = [];
     for (const provider of getInjectionProviders()) {
@@ -1307,6 +1333,13 @@ export async function openAnalyzerModal({ live: isLive = true } = {}) {
     });
     // Wider than SillyTavern's chat column: the analyzer needs the room.
     popup.dlg?.classList.add('cr-analyzer-popup');
-    await popup.show();
-    root = null;
+    const { eventSource } = SillyTavern.getContext();
+    eventSource?.on?.(VARIABLES_CHANGED_EVENT, onVariablesChanged);
+    try {
+        await popup.show();
+    } finally {
+        eventSource?.removeListener?.(VARIABLES_CHANGED_EVENT, onVariablesChanged);
+        clearTimeout(valuesTimer);
+        root = null;
+    }
 }
